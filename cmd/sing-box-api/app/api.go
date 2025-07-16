@@ -6,9 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2/klogflag"
 
-	"sing-box-web/cmd/sing-box-api/options"
+	"sing-box-web/cmd/sing-box-api/app/options"
 )
 
 // sing-box-api 是 sing-box-web 的 api 服务，用于提供给 sing-box-web 使用

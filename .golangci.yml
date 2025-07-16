@@ -1,0 +1,176 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+    - api/generated
+    - ui/node_modules
+  skip-files:
+    - ".*\\.pb\\.go"
+    - ".*_mock\\.go"
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters-settings:
+  dupl:
+    threshold: 100
+  
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    
+  exhaustive:
+    default-signifies-exhaustive: false
+    
+  funlen:
+    lines: 100
+    statements: 50
+    
+  gocognit:
+    min-complexity: 15
+    
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+    
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - wrapperFunc
+      
+  gocyclo:
+    min-complexity: 15
+    
+  godot:
+    scope: declarations
+    capital: false
+    
+  gofmt:
+    simplify: true
+    
+  goimports:
+    local-prefixes: sing-box-web
+    
+  golint:
+    min-confidence: 0
+    
+  gomnd:
+    settings:
+      mnd:
+        checks: argument,case,condition,operation,return,assign
+        
+  govet:
+    check-shadowing: true
+    settings:
+      printf:
+        funcs:
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+          
+  lll:
+    line-length: 140
+    
+  maligned:
+    suggest-new: true
+    
+  misspell:
+    locale: US
+    
+  nolintlint:
+    allow-leading-space: true
+    allow-unused: false
+    require-explanation: false
+    require-specific: false
+
+linters:
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - exhaustive
+    - funlen
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - interfacer
+    - lll
+    - misspell
+    - nakedret
+    - noctx
+    - nolintlint
+    - rowserrcheck
+    - scopelint
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+
+  disable:
+    - maligned  # 结构体字段对齐检查太严格
+    - prealloc  # 预分配slice检查太严格
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gomnd
+        - funlen
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        
+    - path: internal/generated/
+      linters:
+        - golint
+        - stylecheck
+        
+    - path: cmd/
+      linters:
+        - gochecknoinits
+        
+    - text: "weak cryptographic primitive"
+      linters:
+        - gosec
+        
+    - text: "Use of builtin 'println'"
+      linters:
+        - gocritic
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+  fix: false 

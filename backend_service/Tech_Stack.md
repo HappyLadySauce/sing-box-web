@@ -1,406 +1,999 @@
 # 技术选型建议 - sing-box-web
 
-## 1. 技术选型概述
+## 1. 系统架构概览
 
-基于 sing-box-web 项目的功能需求、性能要求和团队技术背景，我们推荐以下核心技术栈：
+### 1.1 整体架构图
 
-| 技术类别 | 推荐选择 | 版本要求 | 选择理由 |
-|---------|---------|---------|---------|
-| **核心语言** | Go | 1.21+ | 高性能、并发优秀、生态丰富 |
-| **Web框架** | Gin | v1.9+ | 轻量高效、中间件丰富、社区活跃 |
-| **RPC框架** | gRPC | v1.58+ | 高性能、类型安全、双向流支持 |
-| **数据库** | PostgreSQL | 15+ | 功能完整、JSON支持、高并发 |
-| **缓存** | Redis | 7.0+ | 高性能、数据结构丰富 |
-| **监控** | Prometheus + Grafana | Latest | 开源标准、功能强大 |
-| **日志** | Logrus + ELK | Latest | 结构化日志、集中收集 |
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         前端用户界面                              │
+│                        (React/Vue.js)                           │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ HTTP/WebSocket
+┌─────────────────────────────▼───────────────────────────────────┐
+│                      sing-box-web                               │
+│                    (Go + Gin Framework)                         │
+│                                                                 │
+│ • 静态资源服务    • 用户认证     • 会话管理                        │
+│ • API代理转发     • 操作审计     • WebSocket通信                  │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ gRPC over TLS
+┌─────────────────────────────▼───────────────────────────────────┐
+│                      sing-box-api                               │
+│                   (Go + Gin + gRPC)                            │
+│                                                                 │
+│ • 节点管理        • 配置模板     • 部署编排                        │
+│ • 监控数据        • 业务逻辑     • 数据存储                        │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ gRPC Client Pool
+┌─────────────────────────────▼───────────────────────────────────┐
+│                    sing-box-agent                               │
+│                     (Go + gRPC)                                │
+│                                                                 │
+│ • sing-box控制    • 系统监控     • Clash API代理                  │
+│ • 配置应用        • 进程管理     • 实时状态上报                     │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ Process Control
+┌─────────────────────────────▼───────────────────────────────────┐
+│                        sing-box                                │
+│                   (C++ Core Binary)                            │
+│                                                                 │
+│ • 代理服务        • Clash API   • 配置热重载                      │
+│ • 流量处理        • 状态监控     • 日志输出                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 技术栈分层
+
+| 层级 | 组件 | 主要技术 | 职责 |
+|------|------|----------|------|
+| **前端层** | Web UI | React 18 + TypeScript + Vite | 用户界面、状态管理 |
+| **网关层** | sing-box-web | Go 1.21 + Gin + WebSocket | 前端服务、认证代理 |
+| **业务层** | sing-box-api | Go 1.21 + Gin + gRPC + GORM | 核心业务、数据管理 |
+| **代理层** | sing-box-agent | Go 1.21 + gRPC Client | 节点控制、监控收集 |
+| **存储层** | Database | PostgreSQL + Redis + TimescaleDB | 数据持久化、缓存 |
+| **监控层** | Monitoring | Prometheus + Grafana + SkyWalking | 可观测性、告警 |
 
 ---
 
-## 2. 核心技术详细分析
+## 2. 核心技术选型
 
-### 2.1 编程语言：Go
+### 2.1 编程语言选择
 
-#### 选择理由
-- **并发优势**: Goroutine 轻量级线程，天然适合处理大量 Agent 连接
-- **网络性能**: 优秀的网络库，适合实时通信和 gRPC 服务
-- **部署便利**: 单二进制文件，容器化部署简单
-- **生态丰富**: gRPC、数据库驱动、监控工具等库成熟
-- **团队匹配**: 与 sing-box 项目技术栈一致，降低学习成本
+#### Go 1.21+ (主要开发语言)
 
-#### 版本建议
-- **最低版本**: Go 1.21（支持最新语言特性和性能优化）
-- **推荐版本**: Go 1.22+（更好的性能和工具链）
+**选择理由**：
+- **高性能**：原生并发支持，适合高并发场景
+- **跨平台**：支持多操作系统和架构编译
+- **生态丰富**：完善的Web框架、gRPC、数据库工具
+- **部署简单**：单二进制文件，无运行时依赖
+- **团队友好**：语法简洁，学习成本低
+- **内存安全**：垃圾回收，避免内存泄漏
 
-#### 替代方案对比
-| 语言 | 优势 | 劣势 | 适用场景 |
-|------|------|------|---------|
-| **Rust** | 极致性能、内存安全 | 学习曲线陡峭、开发效率低 | 对性能要求极高的场景 |
-| **Java** | 生态成熟、企业级支持 | 资源占用大、启动慢 | 大型企业系统 |
-| **Node.js** | 开发效率高、JSON原生 | 单线程瓶颈、CPU密集型弱 | 轻量级API服务 |
+**版本要求**：Go 1.21+
+- 支持泛型和最新性能优化
+- 改进的garbage collector
+- 更好的编译时间和运行性能
 
-### 2.2 Web框架：Gin
+---
 
-#### 选择理由
-- **性能优秀**: 基于 httprouter，路由性能极佳
-- **中间件丰富**: 认证、CORS、日志、限流等中间件完善
-- **开发效率**: API简洁，学习成本低
-- **社区活跃**: 大量第三方插件和示例
+## 3. 应用框架选型
 
-#### 核心特性
+### 3.1 sing-box-web (前端服务器)
+
+#### Web框架：Gin 1.9+
+
 ```go
-// 路由定义示例
-r := gin.Default()
+// 选择理由
+• 轻量高性能    - 路由性能优秀，中间件丰富
+• 开发效率高    - 简洁的API设计，快速开发
+• 社区活跃      - 大量中间件和插件支持
+• 部署简单      - 编译为单一可执行文件
+```
+
+**核心依赖包**：
+```go
+// Web框架核心
+github.com/gin-gonic/gin v1.9.1
+
+// 认证相关
+github.com/golang-jwt/jwt/v5 v5.0.0
+github.com/gin-contrib/sessions v0.0.5
 
 // 中间件
-r.Use(middleware.CORS())
-r.Use(middleware.JWT())
-r.Use(middleware.RequestID())
+github.com/gin-contrib/cors v1.4.0
+github.com/gin-contrib/secure v0.0.1
+github.com/gin-contrib/gzip v0.0.6
 
-// 路由组
-v1 := r.Group("/v1")
-{
-    nodes := v1.Group("/nodes")
-    {
-        nodes.GET("", nodeHandler.List)
-        nodes.POST("", nodeHandler.Create)
-        nodes.GET("/:id", nodeHandler.Get)
-        nodes.PUT("/:id", nodeHandler.Update)
-        nodes.DELETE("/:id", nodeHandler.Delete)
-    }
-}
+// WebSocket支持
+github.com/gorilla/websocket v1.5.0
+
+// HTTP客户端
+github.com/go-resty/resty/v2 v2.7.0
 ```
 
-#### 替代方案
-| 框架 | 优势 | 劣势 | 选择建议 |
-|------|------|------|---------|
-| **Echo** | 性能相近、功能丰富 | 社区相对较小 | 可选替代 |
-| **Fiber** | 性能最优、Express风格 | 较新、生态待完善 | 性能优先场景 |
-| **标准库** | 零依赖、完全控制 | 开发效率低、样板代码多 | 极简场景 |
-
-### 2.3 RPC框架：gRPC
-
-#### 选择理由
-- **高性能**: HTTP/2 协议，二进制传输，压缩效率高
-- **类型安全**: Protobuf 强类型定义，避免接口不一致
-- **双向流**: 支持 Agent-Manager 实时通信需求
-- **跨语言**: 便于未来多语言客户端开发
-- **流量控制**: 内置背压、超时、重试机制
-
-#### 服务定义示例
-```protobuf
-service ManagerService {
-  // 双向流连接
-  rpc AgentStream(stream AgentMessage) returns (stream ManagerMessage);
-  
-  // 标准RPC调用
-  rpc GetNodes(GetNodesRequest) returns (GetNodesResponse);
-  rpc UpdateNodeConfig(UpdateNodeConfigRequest) returns (UpdateNodeConfigResponse);
-}
+#### 架构特点
+```
+┌─────────────────┐
+│   HTTP Router   │ ← Gin路由层
+├─────────────────┤
+│   Middleware    │ ← 认证、日志、CORS
+├─────────────────┤
+│   Handlers      │ ← 业务处理器
+├─────────────────┤
+│   gRPC Client   │ ← API服务调用
+├─────────────────┤
+│   WebSocket     │ ← 实时通信
+└─────────────────┘
 ```
 
-#### 性能特点
-- **吞吐量**: 相比 REST API 提升 2-3 倍
-- **延迟**: 二进制序列化，延迟降低 30-50%
-- **连接复用**: HTTP/2 多路复用，减少连接开销
+### 3.2 sing-box-api (核心API服务)
 
-#### 替代方案
-| 协议 | 优势 | 劣势 | 适用场景 |
-|------|------|------|---------|
-| **WebSocket** | 实时性好、浏览器原生支持 | 协议简单、需要自定义消息格式 | 浏览器实时通信 |
-| **TCP Socket** | 性能最优、完全控制 | 开发复杂、需要处理粘包等问题 | 极致性能要求 |
-| **HTTP Long Polling** | 实现简单、兼容性好 | 资源效率低、延迟高 | 简单实时通知 |
+#### gRPC框架：grpc-go 1.59+
 
-### 2.4 数据库：PostgreSQL
-
-#### 选择理由
-- **JSON支持**: 原生 JSONB 类型，适合存储节点元数据和配置
-- **并发性能**: MVCC 机制，读写并发性能优秀
-- **功能完整**: 支持分区、索引、存储过程、窗口函数
-- **数据一致性**: ACID 事务，保证数据安全
-- **扩展性**: 支持插件、自定义类型和函数
-
-#### 数据类型优势
-```sql
--- JSONB 高效存储和查询
-CREATE TABLE nodes (
-    id UUID PRIMARY KEY,
-    name VARCHAR(100),
-    labels JSONB,
-    metadata JSONB
-);
-
--- GIN 索引支持 JSON 查询
-CREATE INDEX idx_nodes_labels ON nodes USING GIN(labels);
-
--- 高效 JSON 查询
-SELECT * FROM nodes WHERE labels @> '{"environment": "production"}';
-```
-
-#### 性能配置
-```postgresql
-# postgresql.conf 优化建议
-shared_buffers = 256MB          # 25% of RAM
-effective_cache_size = 1GB      # 75% of RAM
-random_page_cost = 1.1          # SSD 优化
-checkpoint_completion_target = 0.9
-wal_buffers = 16MB
-max_connections = 200
-```
-
-#### 替代方案
-| 数据库 | 优势 | 劣势 | 适用场景 |
-|-------|------|------|---------|
-| **SQLite** | 零配置、单文件 | 并发写入限制、功能有限 | 单机小规模部署 |
-| **MySQL** | 生态成熟、运维简单 | JSON 支持较弱、锁机制限制 | 传统 Web 应用 |
-| **MongoDB** | 文档存储、水平扩展 | 事务支持弱、内存占用大 | 文档型数据 |
-
-### 2.5 缓存：Redis
-
-#### 选择理由
-- **数据结构**: 支持 String、Hash、List、Set、ZSet，适合多种缓存场景
-- **高性能**: 内存存储，单线程模型避免锁竞争
-- **持久化**: RDB + AOF 双重保障
-- **集群支持**: Redis Cluster 水平扩展
-
-#### 使用场景
 ```go
-// 会话缓存
-redis.Set("session:"+tokenHash, userID, 24*time.Hour)
-
-// 监控数据缓存（最近 1 小时）
-redis.ZAdd("metrics:"+nodeID, redis.Z{
-    Score:  float64(time.Now().Unix()),
-    Member: metricsJSON,
-})
-
-// 分布式锁
-redis.SetNX("lock:config:"+nodeID, "locked", 30*time.Second)
+// 选择理由
+• 高性能通信    - Protocol Buffers序列化，HTTP/2传输
+• 强类型接口    - 接口定义明确，支持多语言
+• 流式处理      - 支持双向流，适合实时数据
+• 负载均衡      - 内置负载均衡和服务发现
 ```
 
-#### 配置建议
-```redis
-# redis.conf 优化
-maxmemory 512mb
-maxmemory-policy allkeys-lru
-save 900 1
-save 300 10
-save 60 10000
+**核心依赖包**：
+```go
+// gRPC核心
+google.golang.org/grpc v1.59.0
+google.golang.org/protobuf v1.31.0
+
+// HTTP服务（管理接口）
+github.com/gin-gonic/gin v1.9.1
+
+// 数据库ORM
+gorm.io/gorm v1.25.4
+gorm.io/driver/postgres v1.5.2
+
+// 缓存
+github.com/redis/go-redis/v9 v9.2.1
+
+// 配置管理
+github.com/spf13/viper v1.17.0
+
+// 监控指标
+github.com/prometheus/client_golang v1.17.0
+
+
 ```
 
-#### 替代方案
-| 缓存方案 | 优势 | 劣势 | 适用场景 |
-|---------|------|------|---------|
-| **Memcached** | 性能极优、内存效率高 | 功能单一、无持久化 | 纯缓存场景 |
-| **内存缓存** | 零延迟、零网络开销 | 无法共享、重启丢失 | 单机缓存 |
-| **Etcd** | 强一致性、分布式 | 性能较低、使用复杂 | 配置存储 |
+#### 服务架构
+```
+┌─────────────────┐
+│   gRPC Server   │ ← 对外服务接口
+├─────────────────┤
+│  HTTP Server    │ ← 管理和监控接口
+├─────────────────┤
+│ Business Logic  │ ← 业务逻辑层
+├─────────────────┤
+│   Repository    │ ← 数据访问层
+├─────────────────┤
+│   Database      │ ← PostgreSQL + Redis
+└─────────────────┘
+```
+
+### 3.3 sing-box-agent (节点代理)
+
+#### 系统控制：原生Go + 系统调用
+
+```go
+// 选择理由
+• 系统集成     - 直接调用systemctl、进程管理
+• 轻量部署     - 最小资源占用，单文件部署
+• 可靠性高     - 断线重连，状态恢复
+• 监控能力     - 实时系统指标收集
+```
+
+**核心依赖包**：
+```go
+// gRPC客户端
+google.golang.org/grpc v1.59.0
+
+// 系统监控
+github.com/shirou/gopsutil/v3 v3.23.9
+
+// 文件监控
+github.com/fsnotify/fsnotify v1.7.0
+
+// HTTP客户端（Clash API）
+github.com/go-resty/resty/v2 v2.7.0
+
+// 进程管理
+golang.org/x/sys v0.13.0
+
+// 配置管理
+github.com/spf13/viper v1.17.0
+```
+
+#### Clash API集成架构
+```
+┌─────────────────┐
+│  gRPC Client    │ ← 与API服务通信
+├─────────────────┤
+│ Clash API Proxy │ ← HTTP代理转发
+├─────────────────┤
+│ Process Manager │ ← sing-box进程控制
+├─────────────────┤
+│ System Monitor  │ ← 系统指标收集
+├─────────────────┤
+│ Config Manager  │ ← 配置文件管理
+└─────────────────┘
+```
 
 ---
 
-## 3. 监控与可观测性
+## 4. 数据存储技术
 
-### 3.1 监控体系：Prometheus + Grafana
+### 4.1 主数据库：PostgreSQL 15+
 
-#### 架构设计
+**选择理由**：
+- **ACID特性**：完整的事务支持，数据一致性保证
+- **JSON支持**：原生JSONB类型，适合动态配置存储
+- **扩展能力**：丰富的扩展插件（如TimescaleDB）
+- **性能优秀**：查询优化器强大，并发性能好
+- **运维成熟**：完善的备份、监控、调优工具
+
+**配置建议**：
 ```yaml
-# 监控架构
-监控数据流:
-  sing-box-api → Prometheus 指标 → Prometheus Server → Grafana 展示
-  
-关键指标:
-  - 系统指标: CPU、内存、磁盘、网络
-  - 应用指标: API响应时间、错误率、并发数
-  - 业务指标: 节点在线率、配置成功率、Agent连接数
+postgres:
+  version: "15.4"
+  settings:
+    max_connections: 200
+    shared_buffers: 256MB
+    effective_cache_size: 1GB
+    work_mem: 4MB
+    maintenance_work_mem: 64MB
+    checkpoint_completion_target: 0.9
+    wal_buffers: 16MB
+    default_statistics_target: 100
 ```
 
-#### Prometheus 指标定义
+### 4.2 缓存数据库：Redis 7+
+
+**选择理由**：
+- **高性能**：内存存储，微秒级响应时间
+- **数据结构丰富**：String、Hash、List、Set、ZSet
+- **分布式锁**：支持分布式场景下的并发控制
+- **持久化选项**：RDB快照 + AOF日志
+- **集群支持**：Redis Cluster模式
+
+**应用场景**：
+```yaml
+redis_usage:
+  session_storage:    # 用户会话存储
+    key_pattern: "session:{token}"
+    ttl: 3600s
+  
+  api_cache:          # API响应缓存
+    key_pattern: "api:{method}:{path}:{params_hash}"
+    ttl: 300s
+  
+  node_status:        # 节点状态缓存
+    key_pattern: "node:status:{node_id}"
+    ttl: 60s
+  
+  distributed_lock:   # 分布式锁
+    key_pattern: "lock:{resource}"
+    ttl: 30s
+```
+
+### 4.3 时序数据库：TimescaleDB
+
+**选择理由**：
+- **PostgreSQL兼容**：完全兼容PostgreSQL生态
+- **自动分区**：按时间自动分区，查询性能优秀
+- **数据压缩**：自动压缩历史数据，节省存储
+- **保留策略**：自动清理过期数据
+- **连续聚合**：预计算聚合视图，提升查询速度
+
+**监控数据存储**：
+```sql
+-- 节点监控指标
+CREATE TABLE node_metrics (
+    time TIMESTAMPTZ NOT NULL,
+    node_id UUID NOT NULL,
+    metric_type VARCHAR(50) NOT NULL,
+    value DOUBLE PRECISION,
+    labels JSONB
+);
+
+-- 转换为超表
+SELECT create_hypertable('node_metrics', 'time');
+
+-- 数据保留策略
+SELECT add_retention_policy('node_metrics', INTERVAL '90 days');
+```
+
+---
+
+## 5. 通信协议与API
+
+### 5.1 gRPC通信协议
+
+#### Protocol Buffers定义
+
+```protobuf
+// api/proto/manager/v1/service.proto
+syntax = "proto3";
+
+package manager.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// 节点管理服务
+service NodeService {
+  // 节点注册
+  rpc RegisterNode(RegisterNodeRequest) returns (RegisterNodeResponse);
+  
+  // 节点心跳
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  
+  // 配置分发
+  rpc DeployConfig(DeployConfigRequest) returns (stream DeployConfigResponse);
+  
+  // 监控数据上报
+  rpc ReportMetrics(stream MetricsReport) returns (google.protobuf.Empty);
+}
+
+// Clash API代理服务
+service ClashService {
+  // 代理Clash API请求
+  rpc ProxyClashAPI(ClashAPIRequest) returns (ClashAPIResponse);
+  
+  // 获取代理状态
+  rpc GetProxyStatus(GetProxyStatusRequest) returns (ProxyStatus);
+  
+  // 切换代理
+  rpc SwitchProxy(SwitchProxyRequest) returns (SwitchProxyResponse);
+}
+```
+
+#### gRPC连接配置
+
+```yaml
+grpc:
+  server:
+    addr: ":9090"
+    network: tcp
+    timeout: 30s
+    keepalive:
+      max_connection_idle: 15s
+      max_connection_age: 30s
+      max_connection_age_grace: 5s
+      time: 5s
+      timeout: 1s
+  
+  client:
+    timeout: 10s
+    keepalive:
+      time: 30s
+      timeout: 5s
+      permit_without_stream: true
+    retry:
+      max_attempts: 3
+      initial_backoff: 1s
+      max_backoff: 30s
+```
+
+### 5.2 RESTful API设计
+
+#### API版本管理
+```
+/api/v1/auth/login          # 用户登录
+/api/v1/auth/logout         # 用户登出
+/api/v1/auth/refresh        # 刷新Token
+
+/api/v1/users               # 用户管理
+/api/v1/nodes               # 节点管理（代理到API服务）
+/api/v1/configs             # 配置管理（代理到API服务）
+/api/v1/deployments         # 部署管理（代理到API服务）
+
+/api/v1/ws/events           # WebSocket事件推送
+```
+
+#### HTTP状态码规范
+```yaml
+http_status:
+  success:
+    200: "OK - 请求成功"
+    201: "Created - 资源创建成功"
+    204: "No Content - 删除成功"
+  
+  client_error:
+    400: "Bad Request - 请求参数错误"
+    401: "Unauthorized - 未认证"
+    403: "Forbidden - 权限不足"
+    404: "Not Found - 资源不存在"
+    409: "Conflict - 资源冲突"
+    422: "Unprocessable Entity - 验证失败"
+  
+  server_error:
+    500: "Internal Server Error - 服务器内部错误"
+    502: "Bad Gateway - 网关错误"
+    503: "Service Unavailable - 服务不可用"
+```
+
+---
+
+## 6. Clash API集成方案
+
+### 6.1 Clash API功能分析
+
+根据 [sing-box Clash API文档](https://sing-box.sagernet.org/zh/configuration/experimental/clash-api/)，主要功能包括：
+
+#### 核心功能
+```yaml
+clash_api_features:
+  proxy_management:
+    - 获取代理列表      # GET /proxies
+    - 获取代理组        # GET /proxies/{name}
+    - 选择代理          # PUT /proxies/{name}
+    - 代理延迟测试      # GET /proxies/{name}/delay
+  
+  traffic_control:
+    - 切换代理模式      # PUT /configs (Rule/Global/Direct)
+    - 流量统计         # GET /traffic
+    - 连接管理         # GET /connections
+    - 关闭连接         # DELETE /connections/{id}
+  
+  configuration:
+    - 获取配置         # GET /configs
+    - 重载配置         # PUT /configs
+    - 获取规则         # GET /rules
+  
+  monitoring:
+    - 实时日志         # GET /logs (WebSocket)
+    - 系统信息         # GET /version
+```
+
+### 6.2 集成架构设计
+
+#### Agent端Clash API代理
+
 ```go
-// 业务指标示例
+// internal/agent/clash/proxy.go
+type ClashAPIProxy struct {
+    baseURL     string
+    secret      string
+    client      *http.Client
+    logger      *logrus.Logger
+    
+    // WebSocket连接池
+    wsConnections map[string]*websocket.Conn
+    wsLock        sync.RWMutex
+}
+
+// 代理HTTP请求
+func (p *ClashAPIProxy) ProxyHTTPRequest(ctx context.Context, req *ClashAPIRequest) (*ClashAPIResponse, error) {
+    // 1. 构建目标URL
+    targetURL := fmt.Sprintf("%s%s", p.baseURL, req.Path)
+    
+    // 2. 创建HTTP请求
+    httpReq, err := http.NewRequestWithContext(ctx, req.Method, targetURL, bytes.NewReader(req.Body))
+    if err != nil {
+        return nil, err
+    }
+    
+    // 3. 添加认证头
+    if p.secret != "" {
+        httpReq.Header.Set("Authorization", "Bearer "+p.secret)
+    }
+    
+    // 4. 复制请求头
+    for k, v := range req.Headers {
+        httpReq.Header.Set(k, v)
+    }
+    
+    // 5. 发送请求
+    resp, err := p.client.Do(httpReq)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+    
+    // 6. 读取响应
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, err
+    }
+    
+    return &ClashAPIResponse{
+        StatusCode: resp.StatusCode,
+        Headers:    convertHeaders(resp.Header),
+        Body:       body,
+    }, nil
+}
+
+// 代理WebSocket连接
+func (p *ClashAPIProxy) ProxyWebSocket(ctx context.Context, req *WebSocketRequest) error {
+    // WebSocket升级和代理逻辑
+    // ...
+}
+```
+
+#### API服务端Clash管理
+
+```go
+// internal/api/service/clash/service.go
+type ClashService struct {
+    nodeManager  NodeManager
+    agentClients map[string]AgentClient
+    logger       *logrus.Logger
+}
+
+func (s *ClashService) ProxyClashAPI(ctx context.Context, nodeID string, req *ClashAPIRequest) (*ClashAPIResponse, error) {
+    // 1. 获取节点Agent客户端
+    client, exists := s.agentClients[nodeID]
+    if !exists {
+        return nil, ErrNodeNotConnected
+    }
+    
+    // 2. 通过gRPC调用Agent
+    grpcReq := &pb.ClashAPIRequest{
+        Method:  req.Method,
+        Path:    req.Path,
+        Headers: req.Headers,
+        Body:    req.Body,
+    }
+    
+    grpcResp, err := client.ProxyClashAPI(ctx, grpcReq)
+    if err != nil {
+        return nil, err
+    }
+    
+    // 3. 转换响应格式
+    return &ClashAPIResponse{
+        StatusCode: int(grpcResp.StatusCode),
+        Headers:    grpcResp.Headers,
+        Body:       grpcResp.Body,
+    }, nil
+}
+
+func (s *ClashService) GetProxyStatus(ctx context.Context, nodeID string) (*ProxyStatus, error) {
+    // 获取节点代理状态
+    req := &ClashAPIRequest{
+        Method: "GET",
+        Path:   "/proxies",
+    }
+    
+    resp, err := s.ProxyClashAPI(ctx, nodeID, req)
+    if err != nil {
+        return nil, err
+    }
+    
+    // 解析代理状态
+    var proxies map[string]interface{}
+    if err := json.Unmarshal(resp.Body, &proxies); err != nil {
+        return nil, err
+    }
+    
+    return &ProxyStatus{
+        Mode:     extractProxyMode(proxies),
+        Current:  extractCurrentProxy(proxies),
+        Proxies:  convertProxyList(proxies),
+    }, nil
+}
+```
+
+#### Web端API代理
+
+```go
+// internal/web/handlers/proxy.go
+func (h *ProxyHandler) HandleClashAPI(c *gin.Context) {
+    nodeID := c.Param("node_id")
+    
+    // 构建代理请求
+    req := &ClashAPIRequest{
+        Method:  c.Request.Method,
+        Path:    c.Param("path"),
+        Headers: convertGinHeaders(c.Request.Header),
+    }
+    
+    // 读取请求体
+    if c.Request.Body != nil {
+        body, err := io.ReadAll(c.Request.Body)
+        if err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read request body"})
+            return
+        }
+        req.Body = body
+    }
+    
+    // 调用API服务
+    resp, err := h.apiClient.ProxyClashAPI(c.Request.Context(), nodeID, req)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    
+    // 返回代理响应
+    for k, v := range resp.Headers {
+        c.Header(k, v)
+    }
+    c.Data(resp.StatusCode, "application/json", resp.Body)
+}
+```
+
+### 6.3 Clash API路由设计
+
+#### RESTful API路由
+```go
+// Web服务器路由
+v1.GET("/nodes/:node_id/clash/proxies", handlers.GetProxies)
+v1.PUT("/nodes/:node_id/clash/proxies/:name", handlers.SelectProxy)
+v1.GET("/nodes/:node_id/clash/proxies/:name/delay", handlers.TestDelay)
+v1.GET("/nodes/:node_id/clash/traffic", handlers.GetTraffic)
+v1.GET("/nodes/:node_id/clash/connections", handlers.GetConnections)
+v1.DELETE("/nodes/:node_id/clash/connections/:id", handlers.CloseConnection)
+v1.PUT("/nodes/:node_id/clash/configs", handlers.UpdateConfig)
+
+// WebSocket路由
+v1.GET("/nodes/:node_id/clash/logs", handlers.StreamLogs)
+```
+
+---
+
+## 7. 监控与可观测性
+
+### 7.1 Prometheus + Grafana
+
+#### 监控指标设计
+
+```go
+// pkg/metrics/prometheus/metrics.go
 var (
-    // 节点状态统计
-    nodeStatusGauge = prometheus.NewGaugeVec(
-        prometheus.GaugeOpts{
-            Name: "singbox_node_status",
-            Help: "Node status (1=online, 0=offline)",
-        },
-        []string{"node_id", "node_name", "status"},
-    )
-    
-    // 配置部署耗时
-    configDeployDuration = prometheus.NewHistogramVec(
-        prometheus.HistogramOpts{
-            Name: "singbox_config_deploy_duration_seconds",
-            Help: "Configuration deployment duration",
-            Buckets: prometheus.DefBuckets,
-        },
-        []string{"node_id", "status"},
-    )
-    
-    // API 请求计数
-    apiRequestsTotal = prometheus.NewCounterVec(
+    // HTTP请求指标
+    httpRequestsTotal = prometheus.NewCounterVec(
         prometheus.CounterOpts{
-            Name: "singbox_api_requests_total",
-            Help: "Total number of API requests",
+            Name: "http_requests_total",
+            Help: "Total number of HTTP requests",
         },
         []string{"method", "endpoint", "status_code"},
+    )
+    
+    // gRPC请求指标
+    grpcRequestsTotal = prometheus.NewCounterVec(
+        prometheus.CounterOpts{
+            Name: "grpc_requests_total", 
+            Help: "Total number of gRPC requests",
+        },
+        []string{"service", "method", "status_code"},
+    )
+    
+    // 节点状态指标
+    nodeStatusGauge = prometheus.NewGaugeVec(
+        prometheus.GaugeOpts{
+            Name: "node_status",
+            Help: "Node status (1=online, 0=offline)",
+        },
+        []string{"node_id", "node_name", "region"},
+    )
+    
+    // Clash API指标
+    clashAPIRequestsTotal = prometheus.NewCounterVec(
+        prometheus.CounterOpts{
+            Name: "clash_api_requests_total",
+            Help: "Total number of Clash API requests",
+        },
+        []string{"node_id", "api_path", "method", "status_code"},
     )
 )
 ```
 
-#### Grafana 仪表盘
-- **系统概览**: 节点状态分布、在线率趋势、资源使用概况
-- **性能监控**: API 响应时间、错误率、吞吐量
-- **业务监控**: 配置部署成功率、Agent 连接状态
-- **告警面板**: 异常节点、资源超限、API 错误
+#### Grafana Dashboard配置
 
-### 3.2 日志系统：Logrus + ELK
-
-#### 日志框架配置
-```go
-// 日志配置示例
-log := logrus.New()
-log.SetFormatter(&logrus.JSONFormatter{
-    TimestampFormat: "2006-01-02T15:04:05.000Z",
-    FieldMap: logrus.FieldMap{
-        logrus.FieldKeyTime:  "timestamp",
-        logrus.FieldKeyLevel: "level",
-        logrus.FieldKeyMsg:   "message",
-    },
-})
-
-// 结构化日志
-log.WithFields(logrus.Fields{
-    "node_id":       nodeID,
-    "deployment_id": deploymentID,
-    "duration":      duration,
-    "status":        "success",
-}).Info("Configuration deployed successfully")
-```
-
-#### 日志等级规范
-- **ERROR**: 系统错误、配置部署失败、Agent 连接异常
-- **WARN**: 节点离线、配置验证警告、性能告警
-- **INFO**: 关键业务操作、用户登录、配置变更
-- **DEBUG**: 详细的调试信息、gRPC 消息追踪
-
----
-
-## 4. 开发工具与环境
-
-### 4.1 开发工具链
-
-#### 代码质量工具
 ```yaml
-# .golangci.yml
-linters:
-  enable:
-    - errcheck      # 错误检查
-    - gofmt         # 代码格式化
-    - goimports     # 导入排序
-    - govet         # Go 静态分析
-    - ineffassign   # 无效赋值
-    - misspell      # 拼写检查
-    - unconvert     # 不必要的类型转换
-    - unparam       # 未使用的参数
-  
-linters-settings:
-  gofmt:
-    simplify: true
-  goimports:
-    local-prefixes: github.com/your-org/sing-box-web
+# grafana/dashboards/sing-box-overview.json
+dashboard:
+  title: "sing-box-web Overview"
+  panels:
+    - title: "Node Status"
+      type: "stat"
+      targets:
+        - expr: "sum(node_status)"
+    
+    - title: "Request Rate"
+      type: "graph"
+      targets:
+        - expr: "rate(http_requests_total[5m])"
+    
+    - title: "Clash API Usage"
+      type: "graph"
+      targets:
+        - expr: "rate(clash_api_requests_total[5m])"
+    
+    - title: "Error Rate"
+      type: "graph"
+      targets:
+        - expr: "rate(http_requests_total{status_code=~'5..'}[5m])"
 ```
 
-#### 测试工具
+### 7.2 链路追踪：SkyWalking Go Agent
+
+#### SkyWalking Go Agent架构
+
+SkyWalking Go Agent采用编译时自动instrument技术，通过Go的`-toolexec`参数在编译过程中自动注入追踪代码，无需显式导入依赖包。
+
+**支持的框架和库**：
+- **HTTP框架**: `net/http`, `gin-gonic/gin`, `gorilla/mux`, `labstack/echo`, `go-chi/chi`
+- **数据库**: `database/sql`, `gorm.io/gorm`, `go-sql-driver/mysql`, `lib/pq`
+- **gRPC**: `google.golang.org/grpc`
+- **Redis**: `go-redis/redis`, `gomodule/redigo`
+- **Kafka**: `Shopify/sarama`, `segmentio/kafka-go`
+- **Elasticsearch**: `elastic/go-elasticsearch`
+
+#### 安装SkyWalking Go Agent
+
+```bash
+# 下载SkyWalking Go Agent
+go install github.com/apache/skywalking-go/tools/go-agent@latest
+
+# 或者从GitHub releases下载二进制文件
+wget https://github.com/apache/skywalking-go/releases/download/v0.4.0/skywalking-go-agent-0.4.0-linux-amd64.tgz
+tar -xzf skywalking-go-agent-0.4.0-linux-amd64.tgz
+```
+
+#### 构建配置
+
+```makefile
+# Makefile中的构建配置
+# SkyWalking Go Agent路径
+SKYWALKING_AGENT_PATH := $(shell which go-agent)
+
+# 环境变量配置
+export SW_AGENT_NAME ?= sing-box-web
+export SW_AGENT_COLLECTOR_BACKEND_SERVICES ?= skywalking-oap:11800
+export SW_AGENT_SAMPLE_N_PER_3_SECS ?= -1
+
+# 构建sing-box-web (自动instrument)
+build-web:
+	@echo "Building sing-box-web with SkyWalking agent..."
+	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+		-toolexec="$(SKYWALKING_AGENT_PATH)" \
+		-ldflags "$(LDFLAGS)" \
+		-o $(BUILD_DIR)/sing-box-web \
+		./cmd/sing-box-web
+
+# 构建sing-box-api (自动instrument)
+build-api:
+	@echo "Building sing-box-api with SkyWalking agent..."
+	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+		-toolexec="$(SKYWALKING_AGENT_PATH)" \
+		-ldflags "$(LDFLAGS)" \
+		-o $(BUILD_DIR)/sing-box-api \
+		-tags skywalking \
+		./cmd/sing-box-api
+
+# 构建sing-box-agent (自动instrument)
+build-agent:
+	@echo "Building sing-box-agent with SkyWalking agent..."
+	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+		-toolexec="$(SKYWALKING_AGENT_PATH)" \
+		-ldflags "$(LDFLAGS)" \
+		-o $(BUILD_DIR)/sing-box-agent \
+		./cmd/sing-box-agent
+
+# 不使用SkyWalking的构建（开发/调试用）
+build-no-tracing:
+	@echo "Building without SkyWalking agent..."
+	@CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/sing-box-web ./cmd/sing-box-web
+	@CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/sing-box-api ./cmd/sing-box-api
+	@CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/sing-box-agent ./cmd/sing-box-agent
+```
+
+#### 应用代码（无需修改）
+
+由于使用自动instrument，应用代码保持原样，无需添加追踪相关代码：
+
 ```go
-// 测试框架组合
-func TestNodeService(t *testing.T) {
-    // 使用 testify 断言
-    assert := assert.New(t)
+// cmd/sing-box-web/main.go - 无需修改
+func main() {
+    // 正常的应用代码，SkyWalking会自动instrument
+    r := gin.Default()
     
-    // 数据库测试（使用 dockertest）
-    db, cleanup := setupTestDB(t)
-    defer cleanup()
+    // 正常注册中间件和路由
+    r.Use(middleware.Logger())
+    r.Use(middleware.Recovery())
     
-    // 服务测试
-    service := NewNodeService(db)
-    node, err := service.CreateNode(context.Background(), createReq)
+    setupRoutes(r)
     
-    assert.NoError(err)
-    assert.Equal("test-node", node.Name)
+    // 启动服务器
+    r.Run(":3000")
+}
+
+// 正常的gRPC服务器代码
+func NewGRPCServer() *grpc.Server {
+    return grpc.NewServer()  // SkyWalking会自动添加拦截器
+}
+
+// 正常的数据库连接代码
+func NewDBConnection(dsn string) (*gorm.DB, error) {
+    return gorm.Open(postgres.Open(dsn), &gorm.Config{})  // 自动instrument
+}
+
+// 正常的HTTP客户端代码
+func CallAPI(url string) error {
+    resp, err := http.Get(url)  // 自动instrument
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+    return nil
 }
 ```
 
-#### 代码生成工具
-```makefile
-# Makefile 工具链
-generate:
-	@echo "Generating protobuf code..."
-	@buf generate
-	@echo "Generating mocks..."
-	@go generate ./...
-	@echo "Generating OpenAPI docs..."
-	@swag init -g cmd/api/main.go
+#### 环境变量配置
 
-tools:
-	@go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	@go install github.com/golang/mock/mockgen@latest
-	@go install github.com/swaggo/swag/cmd/swag@latest
-```
-
-### 4.2 CI/CD 工具选择
-
-#### GitHub Actions 工作流
 ```yaml
-# .github/workflows/ci.yml
-name: CI
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-go@v3
-      with:
-        go-version: 1.21
-    
-    - name: Run tests
-      run: |
-        go mod download
-        make test
-        make lint
-        
-    - name: Build
-      run: make build
+# SkyWalking Go Agent配置
+environment:
+  # 基础配置
+  SW_AGENT_NAME: "sing-box-web"                    # 服务名称
+  SW_AGENT_INSTANCE_NAME: "web-001"                # 实例名称
+  SW_AGENT_COLLECTOR_BACKEND_SERVICES: "skywalking-oap:11800"  # OAP地址
+  
+  # 采样配置
+  SW_AGENT_SAMPLE_N_PER_3_SECS: "-1"               # 采样率(-1=全采样, 0=不采样)
+  
+  # 认证和分组
+  SW_AGENT_AUTHENTICATION: ""                      # 认证token
+  SW_AGENT_NAMESPACE: "production"                 # 命名空间
+  SW_AGENT_CLUSTER: "sing-box-cluster"             # 集群名称
+  
+  # 高级配置
+  SW_AGENT_MAX_SEGMENT_SIZE: "300"                 # 最大segment大小
+  SW_AGENT_DISABLE_PLUGINS: ""                     # 禁用插件列表(逗号分隔)
+  SW_AGENT_LOG_LEVEL: "INFO"                       # 日志级别
+  SW_AGENT_LOG_FILE_PATH: "/var/log/skywalking/agent.log"  # 日志文件路径
 ```
 
-#### 替代CI/CD方案
-| 方案 | 优势 | 劣势 | 适用场景 |
-|------|------|------|---------|
-| **GitLab CI** | 功能完整、私有部署 | 资源占用大 | 企业内部 |
-| **Jenkins** | 高度可定制、插件丰富 | 配置复杂、维护成本高 | 复杂流水线 |
-| **Drone** | 轻量级、容器原生 | 生态相对较小 | 简单 CI/CD |
+#### Docker构建配置
+
+```dockerfile
+# cmd/sing-box-web/Dockerfile
+FROM golang:1.21-alpine AS builder
+
+# 安装SkyWalking Go Agent
+RUN wget -O /tmp/skywalking-go-agent.tgz \
+    https://github.com/apache/skywalking-go/releases/download/v0.4.0/skywalking-go-agent-0.4.0-linux-amd64.tgz && \
+    tar -xzf /tmp/skywalking-go-agent.tgz -C /usr/local/bin && \
+    chmod +x /usr/local/bin/go-agent
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# 使用SkyWalking Go Agent构建
+ENV SW_AGENT_NAME=sing-box-web
+ENV SW_AGENT_COLLECTOR_BACKEND_SERVICES=skywalking-oap:11800
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -toolexec="/usr/local/bin/go-agent" \
+    -a -installsuffix cgo \
+    -ldflags "-X main.version=${VERSION}" \
+    -o sing-box-web ./cmd/sing-box-web
+
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /root/
+
+COPY --from=builder /app/sing-box-web .
+COPY --from=builder /app/configs ./configs
+
+EXPOSE 3000
+CMD ["./sing-box-web"]
+```
+
+#### 支持情况说明
+
+**自动支持的功能**：
+- ✅ Gin HTTP路由和中间件
+- ✅ gRPC服务端和客户端
+- ✅ GORM数据库操作
+- ✅ Redis操作（go-redis）
+- ✅ 标准库http.Client
+
+**需要手动处理的场景**：
+- ❌ WebSocket连接（需要手动span）
+- ❌ 自定义RPC协议
+- ❌ 文件操作
+- ❌ 第三方SDK调用
+
+#### 手动Span示例（不支持的场景）
+
+```go
+// pkg/tracing/manual.go
+// 为不支持自动instrument的场景提供手动span
+
+import (
+    "context"
+    "github.com/SkyAPM/go2sky"  // 仅用于手动span创建
+)
+
+// WebSocket处理器手动添加span
+func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+    // 从context获取当前span（由自动instrument创建）
+    span := go2sky.GetSpan(r.Context())
+    if span != nil {
+        span.SetTag("ws.upgrade", "true")
+        span.Log("WebSocket connection established")
+    }
+    
+    // WebSocket升级和处理逻辑
+    // ...
+}
+
+// 文件操作手动span
+func ProcessConfigFile(ctx context.Context, filename string) error {
+    span, ctx := go2sky.GetTracer().CreateLocalSpan(ctx, "process-config-file")
+    if span != nil {
+        defer span.End()
+        span.SetTag("file.name", filename)
+    }
+    
+    // 文件处理逻辑
+    // ...
+    
+    return nil
+}
+
+// 第三方API调用手动span
+func CallThirdPartyAPI(ctx context.Context, url string) error {
+    span, ctx := go2sky.GetTracer().CreateExitSpan(ctx, "third-party-api", url, 
+        func(header string) error {
+            // 注入trace header到HTTP请求
+            return nil
+        })
+    if span != nil {
+        defer span.End()
+    }
+    
+    // API调用逻辑
+    // ...
+    
+    return nil
+}
+```
+
+### 7.3 日志聚合：ELK Stack
+
+```yaml
+# logging configuration
+logging:
+  level: info
+  format: json
+  outputs:
+    - type: stdout
+    - type: file
+      filename: /var/log/sing-box-web/app.log
+      max_size: 100MB
+      max_backups: 10
+      max_age: 30
+    - type: elasticsearch
+      addresses:
+        - http://localhost:9200
+      index: sing-box-web
+```
 
 ---
 
-## 5. 部署与容器化
+## 8. 部署架构
 
-### 5.1 容器化方案：Docker
+### 8.1 容器化部署：Docker
 
-#### 多阶段构建
+#### Multi-stage Dockerfile
+
 ```dockerfile
-# Dockerfile.api
+# cmd/sing-box-web/Dockerfile
 FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
@@ -408,294 +1001,466 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o sing-box-api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
+    -o sing-box-web ./cmd/sing-box-web
 
 FROM alpine:latest
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /root/
 
-COPY --from=builder /app/sing-box-api .
+COPY --from=builder /app/sing-box-web .
 COPY --from=builder /app/configs ./configs
+COPY --from=builder /app/ui/dist ./ui/dist
 
-CMD ["./sing-box-api", "serve", "--config-file", "configs/api.yaml"]
+EXPOSE 3000
+CMD ["./sing-box-web", "serve"]
 ```
 
-#### 镜像优化策略
-- **多阶段构建**: 减少最终镜像大小（从 ~1GB 降至 ~20MB）
-- **Alpine 基础镜像**: 安全性高、体积小
-- **非 root 用户**: 提升容器安全性
-- **健康检查**: 容器状态监控
+#### Docker Compose配置
 
-### 5.2 编排方案：Kubernetes
-
-#### 部署清单示例
 ```yaml
-# k8s/api-deployment.yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # 数据库服务
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: sing_box_web
+      POSTGRES_USER: sing_box_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+  # SkyWalking服务
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+
+  skywalking-oap:
+    image: apache/skywalking-oap-server:9.7.0
+    environment:
+      SW_STORAGE: elasticsearch
+      SW_STORAGE_ES_CLUSTER_NODES: elasticsearch:9200
+      SW_HEALTH_CHECKER: default
+      SW_TELEMETRY: prometheus
+      JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "11800:11800"  # gRPC
+      - "12800:12800"  # HTTP
+    depends_on:
+      - elasticsearch
+
+  skywalking-ui:
+    image: apache/skywalking-ui:9.7.0
+    environment:
+      SW_OAP_ADDRESS: http://skywalking-oap:12800
+    ports:
+      - "8080:8080"
+    depends_on:
+      - skywalking-oap
+
+  # 应用服务
+  sing-box-api:
+    build:
+      context: .
+      dockerfile: cmd/sing-box-api/Dockerfile
+    environment:
+      - DATABASE_URL=postgres://sing_box_user:${POSTGRES_PASSWORD}@postgres:5432/sing_box_web
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      # SkyWalking配置
+      - SW_AGENT_NAME=sing-box-api
+      - SW_AGENT_INSTANCE_NAME=api-001
+      - SW_AGENT_COLLECTOR_BACKEND_SERVICES=skywalking-oap:11800
+      - SW_AGENT_SAMPLE_N_PER_3_SECS=-1
+      - SW_AGENT_NAMESPACE=production
+      - SW_AGENT_CLUSTER=sing-box-cluster
+    ports:
+      - "8081:8080"  # HTTP管理接口
+      - "9090:9090"  # gRPC接口
+    depends_on:
+      - postgres
+      - redis
+      - skywalking-oap
+
+  sing-box-web:
+    build:
+      context: .
+      dockerfile: cmd/sing-box-web/Dockerfile
+    environment:
+      - API_SERVER_URL=grpc://sing-box-api:9090
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      # SkyWalking配置
+      - SW_AGENT_NAME=sing-box-web
+      - SW_AGENT_INSTANCE_NAME=web-001
+      - SW_AGENT_COLLECTOR_BACKEND_SERVICES=skywalking-oap:11800
+      - SW_AGENT_SAMPLE_N_PER_3_SECS=-1
+      - SW_AGENT_NAMESPACE=production
+      - SW_AGENT_CLUSTER=sing-box-cluster
+    ports:
+      - "3000:3000"
+    depends_on:
+      - sing-box-api
+      - skywalking-oap
+
+  # 监控服务
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+```
+
+### 8.2 Kubernetes部署
+
+```yaml
+# deployments/k8s/sing-box-web.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sing-box-api
+  name: sing-box-web
+  labels:
+    app: sing-box-web
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: sing-box-api
+      app: sing-box-web
   template:
     metadata:
       labels:
-        app: sing-box-api
+        app: sing-box-web
     spec:
       containers:
-      - name: api
-        image: sing-box-api:latest
+      - name: sing-box-web
+        image: sing-box-web:latest
         ports:
-        - containerPort: 8080
-        - containerPort: 9090
+        - containerPort: 3000
         env:
-        - name: DB_HOST
-          value: postgres-service
-        - name: REDIS_HOST
-          value: redis-service
+        - name: API_SERVER_URL
+          value: "grpc://sing-box-api:9090"
         resources:
           requests:
-            memory: "256Mi"
+            memory: "64Mi"
             cpu: "250m"
           limits:
-            memory: "512Mi"
+            memory: "128Mi"
             cpu: "500m"
         livenessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: 3000
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /ready
-            port: 8080
+            port: 3000
           initialDelaySeconds: 5
           periodSeconds: 5
 ```
 
-#### 替代编排方案
-| 方案 | 优势 | 劣势 | 适用场景 |
-|------|------|------|---------|
-| **Docker Compose** | 简单易用、开发友好 | 单机限制、功能有限 | 开发环境、小规模部署 |
-| **Docker Swarm** | 原生集群、学习成本低 | 功能相对简单 | 中小规模集群 |
-| **Nomad** | 轻量级、多工作负载 | 生态相对较小 | 混合工作负载 |
-
 ---
 
-## 6. 安全考虑
+## 9. 开发工具链
 
-### 6.1 认证与授权
+### 9.1 代码质量工具
 
-#### JWT 实现
-```go
-// JWT 配置
-type JWTConfig struct {
-    SecretKey       string        `yaml:"secret_key"`
-    ExpirationTime  time.Duration `yaml:"expiration_time"`
-    RefreshTime     time.Duration `yaml:"refresh_time"`
-    Issuer          string        `yaml:"issuer"`
-}
+#### golangci-lint配置
 
-// 生成 JWT Token
-func (j *JWTService) GenerateToken(userID int, username string) (string, error) {
-    claims := &JWTClaims{
-        UserID:   userID,
-        Username: username,
-        StandardClaims: jwt.StandardClaims{
-            ExpiresAt: time.Now().Add(j.config.ExpirationTime).Unix(),
-            Issuer:    j.config.Issuer,
-            IssuedAt:  time.Now().Unix(),
-        },
-    }
-    
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-    return token.SignedString([]byte(j.config.SecretKey))
-}
+```yaml
+# .golangci.yml
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - varcheck
+    - structcheck
+    - deadcode
+    - gocyclo
+    - gofmt
+    - goimports
+    - gosec
+    - unconvert
+    - dupl
+    - goconst
+    - gocognit
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 2
+    min-occurrences: 2
 ```
 
-#### gRPC 安全
-```go
-// TLS 配置
-func NewTLSCredentials(certFile, keyFile string) (credentials.TransportCredentials, error) {
-    cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-    if err != nil {
-        return nil, err
-    }
-    
-    config := &tls.Config{
-        Certificates: []tls.Certificate{cert},
-        ClientAuth:   tls.RequireAndVerifyClientCert,
-    }
-    
-    return credentials.NewTLS(config), nil
-}
-```
+### 9.2 构建工具：Makefile
 
-### 6.2 数据安全
+```makefile
+# 主要构建目标
+.PHONY: build test lint docker-build
 
-#### 敏感信息加密
-```go
-// 密码加密
-func HashPassword(password string) (string, error) {
-    bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-    return string(bytes), err
-}
+# 变量定义
+VERSION ?= $(shell git describe --tags --always --dirty)
+BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS = -X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME)
 
-// 配置加密（AES-256-GCM）
-func EncryptConfig(plaintext, key []byte) ([]byte, error) {
-    block, err := aes.NewCipher(key)
-    if err != nil {
-        return nil, err
-    }
-    
-    gcm, err := cipher.NewGCM(block)
-    if err != nil {
-        return nil, err
-    }
-    
-    nonce := make([]byte, gcm.NonceSize())
-    if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-        return nil, err
-    }
-    
-    ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
-    return ciphertext, nil
-}
-```
+# SkyWalking Go Agent配置
+SKYWALKING_AGENT_PATH := $(shell which go-agent)
 
----
+# 环境变量配置
+export SW_AGENT_NAME ?= sing-box-web
+export SW_AGENT_COLLECTOR_BACKEND_SERVICES ?= skywalking-oap:11800
+export SW_AGENT_SAMPLE_N_PER_3_SECS ?= -1
 
-## 7. 性能优化建议
+# 构建所有应用（默认使用SkyWalking）
+build: build-web build-api build-agent
 
-### 7.1 数据库优化
+# 使用SkyWalking Go Agent构建
+build-web:
+	@echo "Building sing-box-web with SkyWalking agent..."
+	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+		-toolexec="$(SKYWALKING_AGENT_PATH)" \
+		-ldflags "$(LDFLAGS)" \
+		-o bin/sing-box-web \
+		./cmd/sing-box-web
 
-#### 连接池配置
-```go
-// 数据库连接池
-config := &gorm.Config{
-    Logger: logger.Default.LogMode(logger.Info),
-}
+build-api:
+	@echo "Building sing-box-api with SkyWalking agent..."
+	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+		-toolexec="$(SKYWALKING_AGENT_PATH)" \
+		-ldflags "$(LDFLAGS)" \
+		-o bin/sing-box-api \
+		./cmd/sing-box-api
 
-db, err := gorm.Open(postgres.Open(dsn), config)
-if err != nil {
-    return nil, err
-}
+build-agent:
+	@echo "Building sing-box-agent with SkyWalking agent..."
+	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+		-toolexec="$(SKYWALKING_AGENT_PATH)" \
+		-ldflags "$(LDFLAGS)" \
+		-o bin/sing-box-agent \
+		./cmd/sing-box-agent
 
-sqlDB, err := db.DB()
-if err != nil {
-    return nil, err
-}
+# 不使用SkyWalking的构建（开发/调试用）
+build-no-tracing:
+	@echo "Building without SkyWalking agent..."
+	@CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/sing-box-web ./cmd/sing-box-web
+	@CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/sing-box-api ./cmd/sing-box-api
+	@CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/sing-box-agent ./cmd/sing-box-agent
 
-// 连接池设置
-sqlDB.SetMaxOpenConns(25)           // 最大连接数
-sqlDB.SetMaxIdleConns(5)            // 最大空闲连接
-sqlDB.SetConnMaxLifetime(time.Hour) // 连接最大生命周期
-```
+# 测试
+test:
+	go test -race -coverprofile=coverage.out ./...
 
-#### 查询优化
-```sql
--- 索引优化
-CREATE INDEX CONCURRENTLY idx_nodes_status_heartbeat 
-ON nodes(status, last_heartbeat_at DESC);
+test-integration:
+	go test -tags=integration ./test/integration/...
 
--- 分区表（监控数据）
-CREATE TABLE node_metrics_y2024m01 PARTITION OF node_metrics
-FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+# 代码检查
+lint:
+	golangci-lint run
 
--- 查询优化
-EXPLAIN ANALYZE SELECT * FROM nodes 
-WHERE status = 'online' 
-AND last_heartbeat_at > NOW() - INTERVAL '5 minutes';
-```
+# Docker构建
+docker-build:
+	docker build -f cmd/sing-box-web/Dockerfile -t sing-box-web:$(VERSION) .
+	docker build -f cmd/sing-box-api/Dockerfile -t sing-box-api:$(VERSION) .
+	docker build -f cmd/sing-box-agent/Dockerfile -t sing-box-agent:$(VERSION) .
 
-### 7.2 应用层优化
+# protobuf生成
+proto-gen:
+	protoc --go_out=. --go-grpc_out=. api/proto/**/*.proto
 
-#### 缓存策略
-```go
-// 多级缓存
-type CacheService struct {
-    local  *bigcache.BigCache    // 本地缓存
-    redis  *redis.Client         // 分布式缓存
-}
+# 数据库迁移
+migrate-up:
+	migrate -path migrations -database "$(DATABASE_URL)" up
 
-func (c *CacheService) Get(key string) ([]byte, error) {
-    // 1. 尝试本地缓存
-    if data, err := c.local.Get(key); err == nil {
-        return data, nil
-    }
-    
-    // 2. 尝试 Redis 缓存
-    if data, err := c.redis.Get(key).Bytes(); err == nil {
-        c.local.Set(key, data) // 回写本地缓存
-        return data, nil
-    }
-    
-    return nil, ErrNotFound
-}
-```
+migrate-down:
+	migrate -path migrations -database "$(DATABASE_URL)" down
 
-#### 并发控制
-```go
-// 限流器
-var limiter = rate.NewLimiter(100, 200) // 100 QPS，突发 200
+# 开发环境
+dev-up:
+	docker-compose -f docker-compose.dev.yml up -d
 
-func RateLimitMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        if !limiter.Allow() {
-            c.JSON(429, gin.H{"error": "Rate limit exceeded"})
-            c.Abort()
-            return
-        }
-        c.Next()
-    }
-}
-
-// 工作池
-type WorkerPool struct {
-    workers int
-    jobs    chan Job
-}
-
-func (wp *WorkerPool) Start() {
-    for i := 0; i < wp.workers; i++ {
-        go wp.worker()
-    }
-}
+dev-down:
+	docker-compose -f docker-compose.dev.yml down
 ```
 
 ---
 
-## 8. 总结与建议
+## 10. 安全考虑
 
-### 8.1 技术选型总结
+### 10.1 认证与授权
 
-| 组件 | 推荐方案 | 关键优势 | 风险评估 |
-|------|---------|---------|---------|
-| **语言** | Go 1.21+ | 高性能、并发、生态 | ⭐⭐⭐⭐⭐ |
-| **Web框架** | Gin | 轻量、高效、易用 | ⭐⭐⭐⭐⭐ |
-| **RPC** | gRPC | 类型安全、高性能 | ⭐⭐⭐⭐⭐ |
-| **数据库** | PostgreSQL | 功能完整、JSON支持 | ⭐⭐⭐⭐ |
-| **缓存** | Redis | 高性能、数据结构丰富 | ⭐⭐⭐⭐ |
+```go
+// JWT配置
+jwt:
+  secret: "${JWT_SECRET}"
+  expire_time: 24h
+  refresh_time: 7d
+  issuer: "sing-box-web"
 
-### 8.2 实施建议
+// RBAC权限模型
+permissions:
+  node_management:
+    - "node:read"
+    - "node:write"
+    - "node:delete"
+  
+  config_management:
+    - "config:read"
+    - "config:write"
+    - "config:deploy"
+  
+  clash_api:
+    - "clash:proxy"
+    - "clash:traffic"
+    - "clash:config"
+```
 
-#### 开发阶段
-1. **MVP 阶段**: 使用 SQLite + 单机部署，快速验证功能
-2. **测试阶段**: 引入 PostgreSQL + Redis，完善监控
-3. **生产阶段**: 容器化部署，添加集群支持
+### 10.2 TLS/SSL配置
 
-#### 团队建议
-- **后端开发**: 2 名 Go 工程师，1 名 DevOps 工程师
-- **技能要求**: Go、gRPC、PostgreSQL、Docker、K8s
-- **学习路径**: Go 基础 → Web 框架 → gRPC → 数据库优化
+```yaml
+tls:
+  enabled: true
+  cert_file: "/etc/ssl/certs/sing-box-web.crt"
+  key_file: "/etc/ssl/private/sing-box-web.key"
+  min_version: "1.3"
+  cipher_suites:
+    - "TLS_AES_128_GCM_SHA256"
+    - "TLS_AES_256_GCM_SHA384"
+    - "TLS_CHACHA20_POLY1305_SHA256"
+```
 
-#### 风险控制
-- **技术风险**: 选择成熟稳定的技术，避免过新的版本
-- **性能风险**: 提前进行压力测试，制定扩容方案
-- **安全风险**: 实施多层安全防护，定期安全审计
+### 10.3 API安全
 
-这个技术选型方案既保证了系统的高性能和可扩展性，又兼顾了开发效率和维护成本，为 sing-box-web 项目的成功实施提供了坚实的技术基础。 
+```go
+// API限流
+rate_limit:
+  enabled: true
+  requests_per_minute: 100
+  burst: 10
+
+// CORS配置
+cors:
+  allowed_origins:
+    - "https://sing-box.example.com"
+  allowed_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+  allowed_headers:
+    - "Authorization"
+    - "Content-Type"
+  max_age: 86400
+```
+
+---
+
+## 11. 总结
+
+### 11.1 技术栈优势
+
+这个技术栈为sing-box-web项目提供了：
+
+#### 性能优势
+- **Go语言**：高并发、低延迟、内存安全
+- **gRPC**：高效的二进制协议，支持流式处理
+- **PostgreSQL**：强ACID特性，高并发读写
+- **Redis**：内存缓存，微秒级响应
+- **TimescaleDB**：时序数据专业处理
+
+#### 开发效率
+- **Gin框架**：简洁API，快速开发
+- **GORM**：强大的ORM工具
+- **Protocol Buffers**：强类型接口定义
+- **丰富生态**：Go生态系统成熟
+
+#### 运维友好
+- **单二进制部署**：无运行时依赖
+- **容器化支持**：Docker + Kubernetes
+- **完整监控**：Prometheus + Grafana + SkyWalking
+- **自动化构建**：完整的CI/CD流程
+
+#### 扩展性
+- **微服务架构**：清晰的服务边界
+- **水平扩展**：支持多实例部署
+- **插件化设计**：可插拔的组件架构
+- **API版本管理**：平滑的版本升级
+
+### 11.2 Clash API集成优势
+
+- **透明代理**：Agent端完整代理Clash API
+- **统一管理**：通过API服务统一调度
+- **实时监控**：WebSocket支持实时日志
+- **安全控制**：gRPC传输加密，API访问控制
+
+### 11.3 未来扩展计划
+
+1. **多租户支持**：企业级多租户管理
+2. **插件系统**：第三方插件扩展
+3. **移动端支持**：React Native移动应用
+4. **AI集成**：智能配置推荐和故障诊断
+5. **边缘计算**：边缘节点管理和调度
+
+这个技术栈充分考虑了性能、可维护性、扩展性和安全性，为构建企业级sing-box管理平台提供了坚实的技术基础。 
