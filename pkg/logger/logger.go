@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"github.com/spf13/pflag"
 )
 
 // Logger 日志接口
@@ -290,4 +291,16 @@ func WithFields(fields map[string]interface{}) Logger {
 // WithError 添加错误字段
 func WithError(err error) Logger {
 	return GetDefaultLogger().WithError(err)
+}
+
+// AddFlags 添加日志相关的命令行参数
+func AddFlags(fs *pflag.FlagSet) {
+	fs.String("log-level", "info", "Log level (debug, info, warn, error, fatal)")
+	fs.String("log-format", "json", "Log format (json, text)")
+	fs.String("log-output", "stdout", "Log output (stdout, stderr, file)")
+	fs.String("log-file-path", "", "Log file path when output is file")
+	fs.Int("log-file-max-size", 100, "Log file max size in MB")
+	fs.Int("log-file-max-backups", 3, "Log file max backups")
+	fs.Int("log-file-max-age", 28, "Log file max age in days")
+	fs.Bool("log-file-compress", true, "Compress log file backups")
 } 

@@ -1,6 +1,7 @@
 package options
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/spf13/pflag"
@@ -15,6 +16,20 @@ type Options struct {
 // NewOptions returns initialized Options.
 func NewOptions() *Options {
 	return &Options{}
+}
+
+// Validate validates the options.
+func (o *Options) Validate() error {
+	if o == nil {
+		return fmt.Errorf("options cannot be nil")
+	}
+	if o.Port <= 0 || o.Port > 65535 {
+		return fmt.Errorf("invalid port: %d, must be between 1 and 65535", o.Port)
+	}
+	if o.BindAddress == nil {
+		return fmt.Errorf("bind address cannot be nil")
+	}
+	return nil
 }
 
 // AddFlags adds flags of api to the specified FlagSet

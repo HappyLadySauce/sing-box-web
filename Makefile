@@ -169,8 +169,8 @@ install-tools:
 install-skywalking:
 	@echo "Installing SkyWalking Go Agent..."
 	@if ! command -v go-agent >/dev/null 2>&1; then \
-		echo "Installing SkyWalking Go Agent from github.com/apache/skywalking-go..."; \
-		go install github.com/apache/skywalking-go/tools/go-agent@latest; \
+		echo "Installing SkyWalking Go Agent from github.com/apache/skywalking-go/tools/go-agent..."; \
+		export PATH=$$PATH:$$HOME/go/bin && go install github.com/apache/skywalking-go/tools/go-agent@latest; \
 		echo "SkyWalking Go Agent installed successfully"; \
 	else \
 		echo "SkyWalking Go Agent already installed: $$(which go-agent)"; \
