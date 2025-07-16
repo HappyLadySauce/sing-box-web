@@ -1,0 +1,27 @@
+package options
+
+import (
+	"net"
+
+	"github.com/spf13/pflag"
+)
+
+// Options contains everything necessary to create and run api.
+type Options struct {
+	BindAddress                   net.IP
+	Port                          int
+}
+
+// NewOptions returns initialized Options.
+func NewOptions() *Options {
+	return &Options{}
+}
+
+// AddFlags adds flags of api to the specified FlagSet
+func (o *Options) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+	fs.IPVar(&o.BindAddress, "bind-address", net.IPv4(127, 0, 0, 1), "IP address on which to serve the --port, set to 0.0.0.0 for all interfaces")
+	fs.IntVar(&o.Port, "port", 8001, "secure port to listen to for incoming HTTPS requests")
+}
