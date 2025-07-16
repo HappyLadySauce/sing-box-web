@@ -43,9 +43,7 @@ cmd/sing-box-api/
 ├── main.go                         # 应用入口点
 ├── app/                            # 应用逻辑层
 │   ├── options/                    # 命令行选项
-│   │   ├── options.go              # 主要选项定义
-│   │   ├── validation.go           # 选项验证
-│   │   └── completion.go           # 命令行补全
+│   │   └── options.go              # 命令行选项
 │   ├── server/                     # 服务器逻辑
 │   │   ├── server.go               # 服务器主逻辑
 │   │   ├── grpc.go                 # gRPC 服务器
