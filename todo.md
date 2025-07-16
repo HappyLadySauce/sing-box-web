@@ -69,7 +69,6 @@
 - [x] 配置开发工具
   - [x] `.golangci.yml` 配置
   - [ ] `.editorconfig` 配置
-  - [ ] VSCode/GoLand 配置
 
 ### 🛠️ 开发工具安装
 - [x] 安装 Go 1.21+
