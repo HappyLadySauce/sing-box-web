@@ -6,22 +6,22 @@ import "time"
 type APIConfig struct {
 	APIVersion string `yaml:"apiVersion" json:"apiVersion"`
 	Kind       string `yaml:"kind" json:"kind"`
-	
+
 	// gRPC server configuration
 	GRPC GRPCServerConfig `yaml:"grpc" json:"grpc"`
-	
+
 	// Database configuration
 	Database DatabaseConfig `yaml:"database" json:"database"`
-	
+
 	// Logging configuration
 	Log LogConfig `yaml:"log" json:"log"`
-	
+
 	// Metrics configuration
 	Metrics MetricsConfig `yaml:"metrics" json:"metrics"`
-	
+
 	// SkyWalking configuration
 	SkyWalking SkyWalkingConfig `yaml:"skywalking" json:"skywalking"`
-	
+
 	// Business configuration
 	Business BusinessConfig `yaml:"business" json:"business"`
 }
@@ -45,25 +45,25 @@ type GRPCServerConfig struct {
 type BusinessConfig struct {
 	// Traffic management
 	Traffic TrafficConfig `yaml:"traffic" json:"traffic"`
-	
+
 	// Node management
 	Node NodeConfig `yaml:"node" json:"node"`
-	
+
 	// User management
 	User UserConfig `yaml:"user" json:"user"`
-	
+
 	// Alert configuration
 	Alert AlertConfig `yaml:"alert" json:"alert"`
 }
 
 // TrafficConfig defines traffic management configuration
 type TrafficConfig struct {
-	ReportInterval     time.Duration `yaml:"reportInterval" json:"reportInterval"`
-	BatchSize          int           `yaml:"batchSize" json:"batchSize"`
-	RetentionDays      int           `yaml:"retentionDays" json:"retentionDays"`
-	EnableCompression  bool          `yaml:"enableCompression" json:"enableCompression"`
-	EnableAggregation  bool          `yaml:"enableAggregation" json:"enableAggregation"`
-	AggregationWindow  time.Duration `yaml:"aggregationWindow" json:"aggregationWindow"`
+	ReportInterval    time.Duration `yaml:"reportInterval" json:"reportInterval"`
+	BatchSize         int           `yaml:"batchSize" json:"batchSize"`
+	RetentionDays     int           `yaml:"retentionDays" json:"retentionDays"`
+	EnableCompression bool          `yaml:"enableCompression" json:"enableCompression"`
+	EnableAggregation bool          `yaml:"enableAggregation" json:"enableAggregation"`
+	AggregationWindow time.Duration `yaml:"aggregationWindow" json:"aggregationWindow"`
 }
 
 // NodeConfig defines node management configuration
@@ -78,10 +78,10 @@ type NodeConfig struct {
 
 // UserConfig defines user management configuration
 type UserConfig struct {
-	MaxUsersPerNode    int           `yaml:"maxUsersPerNode" json:"maxUsersPerNode"`
-	DefaultPlanID      int64         `yaml:"defaultPlanID" json:"defaultPlanID"`
-	PasswordMinLength  int           `yaml:"passwordMinLength" json:"passwordMinLength"`
-	EnableUserLimit    bool          `yaml:"enableUserLimit" json:"enableUserLimit"`
+	MaxUsersPerNode        int           `yaml:"maxUsersPerNode" json:"maxUsersPerNode"`
+	DefaultPlanID          int64         `yaml:"defaultPlanID" json:"defaultPlanID"`
+	PasswordMinLength      int           `yaml:"passwordMinLength" json:"passwordMinLength"`
+	EnableUserLimit        bool          `yaml:"enableUserLimit" json:"enableUserLimit"`
 	UserLimitCheckInterval time.Duration `yaml:"userLimitCheckInterval" json:"userLimitCheckInterval"`
 }
 

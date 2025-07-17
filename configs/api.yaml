@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: APIConfig
+
+# gRPC server configuration
+grpc:
+  address: "0.0.0.0"
+  port: 8081
+  connectionTimeout: 10s
+  keepaliveTime: 30s
+  keepaliveTimeout: 5s
+  maxRecvMsgSize: 16777216  # 16MB
+  maxSendMsgSize: 16777216  # 16MB
+  tlsEnabled: false
+  certFile: ""
+  keyFile: ""
+  clientCAs: ""
+
+# Database configuration
+database:
+  driver: "sqlite"
+  host: ""
+  port: 0
+  database: "./data/sing_box_api.db"
+  username: ""
+  password: ""
+  maxIdleConns: 10
+  maxOpenConns: 100
+  maxLifetime: 1h
+
+# Logging configuration
+log:
+  level: "info"
+  format: "json"
+  output: "stdout"
+  maxSize: 100
+  maxAge: 7
+  maxBackups: 3
+  compress: true
+
+# Metrics configuration
+metrics:
+  enabled: true
+  address: "0.0.0.0"
+  port: 9091
+  path: "/metrics"
+
+# SkyWalking configuration
+skywalking:
+  enabled: false
+  collector: "localhost:11800"
+  serviceName: "sing-box-api"
+  sampleRate: 1
+
+# Business configuration
+business:
+  traffic:
+    reportInterval: 10s
+    batchSize: 100
+    retentionDays: 30
+  node:
+    heartbeatInterval: 30s
+    heartbeatTimeout: 10s
+    maxOfflineTime: 5m
+    configSyncInterval: 1m
+  user:
+    maxUsersPerNode: 1000
+    passwordMinLength: 8
+    defaultPlan: 1

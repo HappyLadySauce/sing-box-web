@@ -9,8 +9,8 @@ import (
 
 // Options contains everything necessary to create and run api.
 type Options struct {
-	BindAddress                   net.IP
-	Port                          int
+	BindAddress net.IP
+	Port        int
 }
 
 // NewOptions returns initialized Options.

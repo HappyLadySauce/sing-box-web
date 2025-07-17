@@ -19,6 +19,8 @@ var (
 	globalLogger *zap.Logger
 	// Global sugared logger instance
 	globalSugar *zap.SugaredLogger
+	// Current log level for dynamic level changes
+	currentLevel zapcore.Level
 )
 
 // Logger wraps zap.Logger with additional functionality
@@ -39,10 +41,10 @@ func InitLogger(config configv1.LogConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
-	
+
 	globalLogger = logger.Logger
 	globalSugar = logger.Logger.Sugar()
-	
+
 	return nil
 }
 
@@ -50,7 +52,7 @@ func InitLogger(config configv1.LogConfig) error {
 func NewLogger(config configv1.LogConfig) (*Logger, error) {
 	// Build encoder config
 	encoderConfig := buildEncoderConfig()
-	
+
 	// Build encoder
 	var encoder zapcore.Encoder
 	switch strings.ToLower(config.Format) {
@@ -61,31 +63,34 @@ func NewLogger(config configv1.LogConfig) (*Logger, error) {
 	default:
 		encoder = zapcore.NewJSONEncoder(encoderConfig)
 	}
-	
+
 	// Build writer syncer
 	writeSyncer, err := buildWriteSyncer(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build write syncer: %w", err)
 	}
-	
+
 	// Parse log level
 	level, err := parseLogLevel(config.Level)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
-	
+
+	// Store current level for dynamic changes
+	currentLevel = level
+
 	// Create core
 	core := zapcore.NewCore(encoder, writeSyncer, level)
-	
+
 	// Create logger with options
 	opts := []zap.Option{
 		zap.AddCaller(),
 		zap.AddCallerSkip(1),
 		zap.AddStacktrace(zapcore.ErrorLevel),
 	}
-	
+
 	logger := zap.New(core, opts...)
-	
+
 	return &Logger{
 		Logger: logger,
 		config: config,
@@ -122,13 +127,13 @@ func buildWriteSyncer(config configv1.LogConfig) (zapcore.WriteSyncer, error) {
 		if !filepath.IsAbs(config.Output) {
 			return nil, fmt.Errorf("log file path must be absolute: %s", config.Output)
 		}
-		
+
 		// Create directory if it doesn't exist
 		dir := filepath.Dir(config.Output)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create log directory: %w", err)
 		}
-		
+
 		// Configure log rotation
 		rotator := &lumberjack.Logger{
 			Filename:   config.Output,
@@ -138,7 +143,7 @@ func buildWriteSyncer(config configv1.LogConfig) (zapcore.WriteSyncer, error) {
 			Compress:   config.Compress,
 			LocalTime:  true,
 		}
-		
+
 		return zapcore.AddSync(rotator), nil
 	}
 }
@@ -356,7 +361,7 @@ func SetLevel(level string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// This requires rebuilding the logger to change the level
 	// For simplicity, we'll return an error indicating restart is needed
 	return fmt.Errorf("dynamic level change requires logger restart")
@@ -364,7 +369,113 @@ func SetLevel(level string) error {
 
 // GetCurrentLevel returns the current log level as a string
 func GetCurrentLevel() string {
-	// This would require storing the current level
-	// For now, return a placeholder
-	return "info"
+	switch currentLevel {
+	case zapcore.DebugLevel:
+		return "debug"
+	case zapcore.InfoLevel:
+		return "info"
+	case zapcore.WarnLevel:
+		return "warn"
+	case zapcore.ErrorLevel:
+		return "error"
+	case zapcore.FatalLevel:
+		return "fatal"
+	default:
+		return "info"
+	}
+}
+
+// Business logging functions with context
+
+// LogUserAction logs user actions for audit trail
+func LogUserAction(userID, action string, details map[string]interface{}) {
+	fields := []zap.Field{
+		zap.String("user_id", userID),
+		zap.String("action", action),
+		zap.String("category", "user_action"),
+	}
+
+	for k, v := range details {
+		fields = append(fields, zap.Any(k, v))
+	}
+
+	Info("User action logged", fields...)
+}
+
+// LogNodeEvent logs node-related events
+func LogNodeEvent(nodeID, event string, details map[string]interface{}) {
+	fields := []zap.Field{
+		zap.String("node_id", nodeID),
+		zap.String("event", event),
+		zap.String("category", "node_event"),
+	}
+
+	for k, v := range details {
+		fields = append(fields, zap.Any(k, v))
+	}
+
+	Info("Node event logged", fields...)
+}
+
+// LogAPICall logs API calls for monitoring
+func LogAPICall(method, path string, duration time.Duration, statusCode int, userID string) {
+	fields := []zap.Field{
+		zap.String("method", method),
+		zap.String("path", path),
+		zap.Duration("duration", duration),
+		zap.Int("status_code", statusCode),
+		zap.String("category", "api_call"),
+	}
+
+	if userID != "" {
+		fields = append(fields, zap.String("user_id", userID))
+	}
+
+	Info("API call logged", fields...)
+}
+
+// LogGRPCCall logs gRPC calls for monitoring
+func LogGRPCCall(service, method string, duration time.Duration, err error) {
+	fields := []zap.Field{
+		zap.String("service", service),
+		zap.String("method", method),
+		zap.Duration("duration", duration),
+		zap.String("category", "grpc_call"),
+	}
+
+	if err != nil {
+		fields = append(fields, zap.Error(err))
+		Error("gRPC call failed", fields...)
+	} else {
+		Info("gRPC call completed", fields...)
+	}
+}
+
+// LogSystemMetrics logs system metrics
+func LogSystemMetrics(nodeID string, metrics map[string]interface{}) {
+	fields := []zap.Field{
+		zap.String("node_id", nodeID),
+		zap.String("category", "system_metrics"),
+		zap.Time("timestamp", time.Now()),
+	}
+
+	for k, v := range metrics {
+		fields = append(fields, zap.Any(k, v))
+	}
+
+	Debug("System metrics logged", fields...)
+}
+
+// LogTrafficData logs traffic data for analysis
+func LogTrafficData(userID, nodeID string, upload, download int64) {
+	fields := []zap.Field{
+		zap.String("user_id", userID),
+		zap.String("node_id", nodeID),
+		zap.Int64("upload_bytes", upload),
+		zap.Int64("download_bytes", download),
+		zap.String("category", "traffic_data"),
+		zap.Time("timestamp", time.Now()),
+	}
+
+	Debug("Traffic data logged", fields...)
 }

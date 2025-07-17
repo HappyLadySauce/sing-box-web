@@ -6,25 +6,25 @@ import "time"
 type WebConfig struct {
 	APIVersion string `yaml:"apiVersion" json:"apiVersion"`
 	Kind       string `yaml:"kind" json:"kind"`
-	
+
 	// Server configuration
 	Server ServerConfig `yaml:"server" json:"server"`
-	
+
 	// Database configuration
 	Database DatabaseConfig `yaml:"database" json:"database"`
-	
+
 	// API server connection
 	APIServer APIServerConnection `yaml:"apiServer" json:"apiServer"`
-	
+
 	// Authentication configuration
 	Auth AuthConfig `yaml:"auth" json:"auth"`
-	
+
 	// Logging configuration
 	Log LogConfig `yaml:"log" json:"log"`
-	
+
 	// Metrics configuration
 	Metrics MetricsConfig `yaml:"metrics" json:"metrics"`
-	
+
 	// SkyWalking configuration
 	SkyWalking SkyWalkingConfig `yaml:"skywalking" json:"skywalking"`
 }
@@ -43,14 +43,14 @@ type ServerConfig struct {
 
 // AuthConfig defines authentication configuration
 type AuthConfig struct {
-	JWTSecret          string        `yaml:"jwtSecret" json:"jwtSecret"`
-	JWTExpiration      time.Duration `yaml:"jwtExpiration" json:"jwtExpiration"`
-	RefreshExpiration  time.Duration `yaml:"refreshExpiration" json:"refreshExpiration"`
-	EnableRateLimit    bool          `yaml:"enableRateLimit" json:"enableRateLimit"`
-	RateLimitRequests  int           `yaml:"rateLimitRequests" json:"rateLimitRequests"`
-	RateLimitDuration  time.Duration `yaml:"rateLimitDuration" json:"rateLimitDuration"`
-	SessionTimeout     time.Duration `yaml:"sessionTimeout" json:"sessionTimeout"`
-	MaxConcurrentSessions int        `yaml:"maxConcurrentSessions" json:"maxConcurrentSessions"`
+	JWTSecret             string        `yaml:"jwtSecret" json:"jwtSecret"`
+	JWTExpiration         time.Duration `yaml:"jwtExpiration" json:"jwtExpiration"`
+	RefreshExpiration     time.Duration `yaml:"refreshExpiration" json:"refreshExpiration"`
+	EnableRateLimit       bool          `yaml:"enableRateLimit" json:"enableRateLimit"`
+	RateLimitRequests     int           `yaml:"rateLimitRequests" json:"rateLimitRequests"`
+	RateLimitDuration     time.Duration `yaml:"rateLimitDuration" json:"rateLimitDuration"`
+	SessionTimeout        time.Duration `yaml:"sessionTimeout" json:"sessionTimeout"`
+	MaxConcurrentSessions int           `yaml:"maxConcurrentSessions" json:"maxConcurrentSessions"`
 }
 
 // DefaultWebConfig returns default web configuration
@@ -67,11 +67,11 @@ func DefaultWebConfig() *WebConfig {
 			TLSEnabled:   false,
 		},
 		Database: DatabaseConfig{
-			Driver:       "mysql",
-			Host:         "localhost",
-			Port:         3306,
-			Database:     "sing_box_web",
-			Username:     "root",
+			Driver:       "sqlite",
+			Host:         "",
+			Port:         0,
+			Database:     "./data/sing_box_web.db",
+			Username:     "",
 			Password:     "",
 			MaxIdleConns: 10,
 			MaxOpenConns: 100,

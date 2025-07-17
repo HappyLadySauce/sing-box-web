@@ -6,25 +6,25 @@ import "time"
 type AgentConfig struct {
 	APIVersion string `yaml:"apiVersion" json:"apiVersion"`
 	Kind       string `yaml:"kind" json:"kind"`
-	
+
 	// Node information
 	Node NodeInfo `yaml:"node" json:"node"`
-	
+
 	// API server connection
 	APIServer APIServerConnection `yaml:"apiServer" json:"apiServer"`
-	
+
 	// sing-box configuration
 	SingBox SingBoxConfig `yaml:"singBox" json:"singBox"`
-	
+
 	// Monitoring configuration
 	Monitor MonitorConfig `yaml:"monitor" json:"monitor"`
-	
+
 	// Logging configuration
 	Log LogConfig `yaml:"log" json:"log"`
-	
+
 	// Metrics configuration
 	Metrics MetricsConfig `yaml:"metrics" json:"metrics"`
-	
+
 	// SkyWalking configuration
 	SkyWalking SkyWalkingConfig `yaml:"skywalking" json:"skywalking"`
 }
@@ -42,12 +42,12 @@ type NodeInfo struct {
 
 // SingBoxConfig defines sing-box related configuration
 type SingBoxConfig struct {
-	BinaryPath     string        `yaml:"binaryPath" json:"binaryPath"`
-	ConfigPath     string        `yaml:"configPath" json:"configPath"`
-	WorkingDir     string        `yaml:"workingDir" json:"workingDir"`
-	LogPath        string        `yaml:"logPath" json:"logPath"`
-	RestartDelay   time.Duration `yaml:"restartDelay" json:"restartDelay"`
-	HealthCheckURL string        `yaml:"healthCheckUrl" json:"healthCheckUrl"`
+	BinaryPath     string         `yaml:"binaryPath" json:"binaryPath"`
+	ConfigPath     string         `yaml:"configPath" json:"configPath"`
+	WorkingDir     string         `yaml:"workingDir" json:"workingDir"`
+	LogPath        string         `yaml:"logPath" json:"logPath"`
+	RestartDelay   time.Duration  `yaml:"restartDelay" json:"restartDelay"`
+	HealthCheckURL string         `yaml:"healthCheckUrl" json:"healthCheckUrl"`
 	ClashAPI       ClashAPIConfig `yaml:"clashApi" json:"clashApi"`
 }
 
@@ -62,23 +62,23 @@ type ClashAPIConfig struct {
 // MonitorConfig defines monitoring configuration
 type MonitorConfig struct {
 	// Data collection intervals
-	SystemMetricsInterval  time.Duration `yaml:"systemMetricsInterval" json:"systemMetricsInterval"`
-	TrafficReportInterval  time.Duration `yaml:"trafficReportInterval" json:"trafficReportInterval"`
-	HeartbeatInterval      time.Duration `yaml:"heartbeatInterval" json:"heartbeatInterval"`
-	
+	SystemMetricsInterval time.Duration `yaml:"systemMetricsInterval" json:"systemMetricsInterval"`
+	TrafficReportInterval time.Duration `yaml:"trafficReportInterval" json:"trafficReportInterval"`
+	HeartbeatInterval     time.Duration `yaml:"heartbeatInterval" json:"heartbeatInterval"`
+
 	// Data collection settings
-	EnableSystemMetrics    bool `yaml:"enableSystemMetrics" json:"enableSystemMetrics"`
-	EnableTrafficReport    bool `yaml:"enableTrafficReport" json:"enableTrafficReport"`
-	EnableConnectionStats  bool `yaml:"enableConnectionStats" json:"enableConnectionStats"`
-	
+	EnableSystemMetrics   bool `yaml:"enableSystemMetrics" json:"enableSystemMetrics"`
+	EnableTrafficReport   bool `yaml:"enableTrafficReport" json:"enableTrafficReport"`
+	EnableConnectionStats bool `yaml:"enableConnectionStats" json:"enableConnectionStats"`
+
 	// Local cache settings
-	LocalCacheSize         int           `yaml:"localCacheSize" json:"localCacheSize"`
+	LocalCacheSize          int           `yaml:"localCacheSize" json:"localCacheSize"`
 	LocalCacheFlushInterval time.Duration `yaml:"localCacheFlushInterval" json:"localCacheFlushInterval"`
-	
+
 	// Retry settings
-	MaxRetries     int           `yaml:"maxRetries" json:"maxRetries"`
-	RetryBackoff   time.Duration `yaml:"retryBackoff" json:"retryBackoff"`
-	RetryTimeout   time.Duration `yaml:"retryTimeout" json:"retryTimeout"`
+	MaxRetries   int           `yaml:"maxRetries" json:"maxRetries"`
+	RetryBackoff time.Duration `yaml:"retryBackoff" json:"retryBackoff"`
+	RetryTimeout time.Duration `yaml:"retryTimeout" json:"retryTimeout"`
 }
 
 // DefaultAgentConfig returns default agent configuration
@@ -116,17 +116,17 @@ func DefaultAgentConfig() *AgentConfig {
 			},
 		},
 		Monitor: MonitorConfig{
-			SystemMetricsInterval:       30 * time.Second,
-			TrafficReportInterval:       5 * time.Minute,
-			HeartbeatInterval:          30 * time.Second,
-			EnableSystemMetrics:        true,
-			EnableTrafficReport:        true,
-			EnableConnectionStats:      true,
-			LocalCacheSize:             1000,
-			LocalCacheFlushInterval:    time.Minute,
-			MaxRetries:                 3,
-			RetryBackoff:               5 * time.Second,
-			RetryTimeout:               30 * time.Second,
+			SystemMetricsInterval:   30 * time.Second,
+			TrafficReportInterval:   5 * time.Minute,
+			HeartbeatInterval:       30 * time.Second,
+			EnableSystemMetrics:     true,
+			EnableTrafficReport:     true,
+			EnableConnectionStats:   true,
+			LocalCacheSize:          1000,
+			LocalCacheFlushInterval: time.Minute,
+			MaxRetries:              3,
+			RetryBackoff:            5 * time.Second,
+			RetryTimeout:            30 * time.Second,
 		},
 		Log: LogConfig{
 			Level:      "info",

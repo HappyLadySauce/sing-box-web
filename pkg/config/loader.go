@@ -1,12 +1,14 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
 	configv1 "sing-box-web/pkg/config/v1"
@@ -17,13 +19,13 @@ import (
 type LoaderOptions struct {
 	// ConfigPath is the path to the configuration file
 	ConfigPath string
-	
+
 	// UseDefaults indicates whether to use default values for missing configurations
 	UseDefaults bool
-	
+
 	// ValidateConfig indicates whether to validate the loaded configuration
 	ValidateConfig bool
-	
+
 	// RequireFile indicates whether the configuration file must exist
 	RequireFile bool
 }
@@ -43,14 +45,14 @@ func NewLoader(options LoaderOptions) *Loader {
 // LoadWebConfig loads web service configuration
 func (l *Loader) LoadWebConfig() (*configv1.WebConfig, error) {
 	var config *configv1.WebConfig
-	
+
 	// Start with defaults if enabled
 	if l.options.UseDefaults {
 		config = configv1.DefaultWebConfig()
 	} else {
 		config = &configv1.WebConfig{}
 	}
-	
+
 	// Load from file if specified
 	if l.options.ConfigPath != "" {
 		if err := l.loadFromFile(l.options.ConfigPath, config); err != nil {
@@ -59,28 +61,28 @@ func (l *Loader) LoadWebConfig() (*configv1.WebConfig, error) {
 			}
 		}
 	}
-	
+
 	// Validate configuration if enabled
 	if l.options.ValidateConfig {
 		if err := validation.ValidateWebConfig(config); err != nil {
 			return nil, fmt.Errorf("web config validation failed: %w", err)
 		}
 	}
-	
+
 	return config, nil
 }
 
 // LoadAPIConfig loads API service configuration
 func (l *Loader) LoadAPIConfig() (*configv1.APIConfig, error) {
 	var config *configv1.APIConfig
-	
+
 	// Start with defaults if enabled
 	if l.options.UseDefaults {
 		config = configv1.DefaultAPIConfig()
 	} else {
 		config = &configv1.APIConfig{}
 	}
-	
+
 	// Load from file if specified
 	if l.options.ConfigPath != "" {
 		if err := l.loadFromFile(l.options.ConfigPath, config); err != nil {
@@ -89,28 +91,28 @@ func (l *Loader) LoadAPIConfig() (*configv1.APIConfig, error) {
 			}
 		}
 	}
-	
+
 	// Validate configuration if enabled
 	if l.options.ValidateConfig {
 		if err := validation.ValidateAPIConfig(config); err != nil {
 			return nil, fmt.Errorf("API config validation failed: %w", err)
 		}
 	}
-	
+
 	return config, nil
 }
 
 // LoadAgentConfig loads agent service configuration
 func (l *Loader) LoadAgentConfig() (*configv1.AgentConfig, error) {
 	var config *configv1.AgentConfig
-	
+
 	// Start with defaults if enabled
 	if l.options.UseDefaults {
 		config = configv1.DefaultAgentConfig()
 	} else {
 		config = &configv1.AgentConfig{}
 	}
-	
+
 	// Load from file if specified
 	if l.options.ConfigPath != "" {
 		if err := l.loadFromFile(l.options.ConfigPath, config); err != nil {
@@ -119,14 +121,14 @@ func (l *Loader) LoadAgentConfig() (*configv1.AgentConfig, error) {
 			}
 		}
 	}
-	
+
 	// Validate configuration if enabled
 	if l.options.ValidateConfig {
 		if err := validation.ValidateAgentConfig(config); err != nil {
 			return nil, fmt.Errorf("agent config validation failed: %w", err)
 		}
 	}
-	
+
 	return config, nil
 }
 
@@ -136,13 +138,13 @@ func (l *Loader) loadFromFile(path string, config interface{}) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return err
 	}
-	
+
 	// Read file content
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read config file %s: %w", path, err)
 	}
-	
+
 	// Determine file format based on extension
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
@@ -166,8 +168,7 @@ func (l *Loader) loadFromYAML(data []byte, config interface{}) error {
 
 // loadFromJSON loads configuration from JSON data
 func (l *Loader) loadFromJSON(data []byte, config interface{}) error {
-	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
-	if err := decoder.Decode(config); err != nil {
+	if err := json.Unmarshal(data, config); err != nil {
 		return fmt.Errorf("failed to parse JSON config: %w", err)
 	}
 	return nil
@@ -195,29 +196,100 @@ func saveConfig(config interface{}, path string) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
-	
+
 	// Marshal to YAML
 	data, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config to YAML: %w", err)
 	}
-	
+
 	// Write to file
 	if err := ioutil.WriteFile(path, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
-	
+
 	return nil
+}
+
+// ViperLoader provides Viper-based configuration loading
+type ViperLoader struct {
+	v *viper.Viper
+}
+
+// NewViperLoader creates a new Viper-based configuration loader
+func NewViperLoader(configName, configPath string, envPrefix string) *ViperLoader {
+	v := viper.New()
+
+	// Set configuration file name and path
+	if configName != "" {
+		v.SetConfigName(configName)
+	}
+	if configPath != "" {
+		v.AddConfigPath(configPath)
+	}
+	v.AddConfigPath(".")
+	v.AddConfigPath("./configs")
+	v.AddConfigPath("/etc/sing-box/")
+
+	// Set environment variable prefix
+	if envPrefix != "" {
+		v.SetEnvPrefix(envPrefix)
+	}
+	v.AutomaticEnv()
+
+	// Replace dots with underscores in environment variables
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	return &ViperLoader{v: v}
+}
+
+// LoadConfig loads configuration using Viper
+func (vl *ViperLoader) LoadConfig(config interface{}) error {
+	// Try to read configuration file
+	if err := vl.v.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// Config file not found; ignore error
+		} else {
+			// Config file was found but another error was produced
+			return fmt.Errorf("failed to read config file: %w", err)
+		}
+	}
+
+	// Unmarshal configuration
+	if err := vl.v.Unmarshal(config); err != nil {
+		return fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	return nil
+}
+
+// SetDefault sets a default value for a configuration key
+func (vl *ViperLoader) SetDefault(key string, value interface{}) {
+	vl.v.SetDefault(key, value)
+}
+
+// SetOverride sets an override value for a configuration key
+func (vl *ViperLoader) SetOverride(key string, value interface{}) {
+	vl.v.Set(key, value)
+}
+
+// GetConfigFilePath returns the path of the configuration file used
+func (vl *ViperLoader) GetConfigFilePath() string {
+	return vl.v.ConfigFileUsed()
 }
 
 // MergeConfigs merges environment variables and command line flags into configuration
 func MergeConfigs(config interface{}, envPrefix string, overrides map[string]interface{}) error {
-	// TODO: Implement environment variable and command line flag merging
-	// This would use reflection to set configuration values from:
-	// 1. Environment variables (with prefix)
-	// 2. Command line flags/overrides
-	
-	return nil
+	// Create a Viper loader for merging
+	vl := NewViperLoader("", "", envPrefix)
+
+	// Apply overrides
+	for key, value := range overrides {
+		vl.SetOverride(key, value)
+	}
+
+	// Load configuration with environment variables and overrides
+	return vl.LoadConfig(config)
 }
 
 // GetConfigTemplate returns a template configuration for the specified service
@@ -242,7 +314,7 @@ func ValidateConfigFile(path string, service string) error {
 		ValidateConfig: true,
 		RequireFile:    true,
 	})
-	
+
 	switch service {
 	case "web":
 		_, err := loader.LoadWebConfig()

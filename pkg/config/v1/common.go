@@ -4,12 +4,12 @@ import "time"
 
 // DatabaseConfig defines database configuration
 type DatabaseConfig struct {
-	Driver   string `yaml:"driver" json:"driver"`
-	Host     string `yaml:"host" json:"host"`
-	Port     int    `yaml:"port" json:"port"`
-	Database string `yaml:"database" json:"database"`
-	Username string `yaml:"username" json:"username"`
-	Password string `yaml:"password" json:"password"`
+	Driver       string        `yaml:"driver" json:"driver"`
+	Host         string        `yaml:"host" json:"host"`
+	Port         int           `yaml:"port" json:"port"`
+	Database     string        `yaml:"database" json:"database"`
+	Username     string        `yaml:"username" json:"username"`
+	Password     string        `yaml:"password" json:"password"`
 	MaxIdleConns int           `yaml:"maxIdleConns" json:"maxIdleConns"`
 	MaxOpenConns int           `yaml:"maxOpenConns" json:"maxOpenConns"`
 	MaxLifetime  time.Duration `yaml:"maxLifetime" json:"maxLifetime"`

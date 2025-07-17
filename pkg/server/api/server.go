@@ -6,10 +6,10 @@ import (
 	"net"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
-	"go.uber.org/zap"
 
 	configv1 "sing-box-web/pkg/config/v1"
 	"sing-box-web/pkg/logger"
@@ -22,16 +22,16 @@ type Server struct {
 	grpcServer *grpc.Server
 	listener   net.Listener
 	logger     *zap.Logger
-	
+
 	// Services
 	managementService *ManagementService
-	agentService     *AgentService
+	agentService      *AgentService
 }
 
 // NewServer creates a new gRPC API server
 func NewServer(config configv1.APIConfig) (*Server, error) {
 	logger := logger.GetLogger().Named("api-server")
-	
+
 	// Create gRPC server with options
 	opts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(config.GRPC.MaxRecvMsgSize),
@@ -46,25 +46,25 @@ func NewServer(config configv1.APIConfig) (*Server, error) {
 			PermitWithoutStream: true,
 		}),
 	}
-	
+
 	// Add TLS if enabled
 	if config.GRPC.TLSEnabled {
 		// TODO: Add TLS configuration
 	}
-	
+
 	grpcServer := grpc.NewServer(opts...)
-	
+
 	// Create services
 	managementService := NewManagementService(config, logger)
 	agentService := NewAgentService(config, logger)
-	
+
 	// Register services
 	pbv1.RegisterManagementServiceServer(grpcServer, managementService)
 	pbv1.RegisterAgentServiceServer(grpcServer, agentService)
-	
+
 	// Register reflection service for development
 	reflection.Register(grpcServer)
-	
+
 	return &Server{
 		config:            config,
 		grpcServer:        grpcServer,
@@ -82,29 +82,29 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", address, err)
 	}
-	
+
 	s.listener = listener
 	s.logger.Info("gRPC server starting",
 		zap.String("address", address),
 		zap.Bool("tls", s.config.GRPC.TLSEnabled),
 	)
-	
+
 	// Start server in goroutine
 	go func() {
 		if err := s.grpcServer.Serve(listener); err != nil {
 			s.logger.Error("gRPC server failed", zap.Error(err))
 		}
 	}()
-	
+
 	// Start services
 	if err := s.managementService.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start management service: %w", err)
 	}
-	
+
 	if err := s.agentService.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start agent service: %w", err)
 	}
-	
+
 	s.logger.Info("gRPC server started successfully")
 	return nil
 }
@@ -112,23 +112,23 @@ func (s *Server) Start(ctx context.Context) error {
 // Stop stops the gRPC server
 func (s *Server) Stop(ctx context.Context) error {
 	s.logger.Info("gRPC server stopping")
-	
+
 	// Stop services
 	if err := s.managementService.Stop(ctx); err != nil {
 		s.logger.Error("failed to stop management service", zap.Error(err))
 	}
-	
+
 	if err := s.agentService.Stop(ctx); err != nil {
 		s.logger.Error("failed to stop agent service", zap.Error(err))
 	}
-	
+
 	// Graceful shutdown with timeout
 	done := make(chan struct{})
 	go func() {
 		s.grpcServer.GracefulStop()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		s.logger.Info("gRPC server stopped gracefully")
@@ -136,11 +136,11 @@ func (s *Server) Stop(ctx context.Context) error {
 		s.logger.Warn("gRPC server force stopped due to timeout")
 		s.grpcServer.Stop()
 	}
-	
+
 	if s.listener != nil {
 		s.listener.Close()
 	}
-	
+
 	return nil
 }
 

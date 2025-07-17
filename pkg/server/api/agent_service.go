@@ -17,14 +17,14 @@ import (
 // AgentService implements the AgentService gRPC service
 type AgentService struct {
 	pbv1.UnimplementedAgentServiceServer
-	
+
 	config configv1.APIConfig
 	logger *zap.Logger
-	
+
 	// Node management
 	nodes    map[string]*NodeState
 	nodesMux sync.RWMutex
-	
+
 	// Command queue for nodes
 	commandQueues map[string]chan *pbv1.PendingCommand
 	queuesMux     sync.RWMutex
@@ -32,10 +32,10 @@ type AgentService struct {
 
 // NodeState represents the state of a connected node
 type NodeState struct {
-	Info      *pbv1.RegisterNodeRequest
-	LastSeen  time.Time
-	Status    *pbv1.NodeStatus
-	Metrics   *pbv1.NodeMetrics
+	Info     *pbv1.RegisterNodeRequest
+	LastSeen time.Time
+	Status   *pbv1.NodeStatus
+	Metrics  *pbv1.NodeMetrics
 }
 
 // NewAgentService creates a new AgentService instance
@@ -51,17 +51,17 @@ func NewAgentService(config configv1.APIConfig, logger *zap.Logger) *AgentServic
 // Start starts the agent service
 func (s *AgentService) Start(ctx context.Context) error {
 	s.logger.Info("agent service starting")
-	
+
 	// Start cleanup goroutine for offline nodes
 	go s.cleanupOfflineNodes(ctx)
-	
+
 	return nil
 }
 
 // Stop stops the agent service
 func (s *AgentService) Stop(ctx context.Context) error {
 	s.logger.Info("agent service stopping")
-	
+
 	// Close all command queues
 	s.queuesMux.Lock()
 	for nodeID, queue := range s.commandQueues {
@@ -69,21 +69,21 @@ func (s *AgentService) Stop(ctx context.Context) error {
 		delete(s.commandQueues, nodeID)
 	}
 	s.queuesMux.Unlock()
-	
+
 	return nil
 }
 
 // RegisterNode registers a new node
 func (s *AgentService) RegisterNode(ctx context.Context, req *pbv1.RegisterNodeRequest) (*pbv1.RegisterNodeResponse, error) {
-	s.logger.Info("RegisterNode called", 
+	s.logger.Info("RegisterNode called",
 		zap.String("node_id", req.NodeId),
 		zap.String("node_name", req.NodeName),
 	)
-	
+
 	if req.NodeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
-	
+
 	// Update node state
 	s.nodesMux.Lock()
 	s.nodes[req.NodeId] = &NodeState{
@@ -92,16 +92,16 @@ func (s *AgentService) RegisterNode(ctx context.Context, req *pbv1.RegisterNodeR
 		Status:   &pbv1.NodeStatus{Status: "online"},
 	}
 	s.nodesMux.Unlock()
-	
+
 	// Create command queue for the node if it doesn't exist
 	s.queuesMux.Lock()
 	if _, exists := s.commandQueues[req.NodeId]; !exists {
 		s.commandQueues[req.NodeId] = make(chan *pbv1.PendingCommand, 100)
 	}
 	s.queuesMux.Unlock()
-	
+
 	s.logger.Info("node registered successfully", zap.String("node_id", req.NodeId))
-	
+
 	return &pbv1.RegisterNodeResponse{
 		Success: true,
 		Message: "node registered successfully",
@@ -111,11 +111,11 @@ func (s *AgentService) RegisterNode(ctx context.Context, req *pbv1.RegisterNodeR
 // Heartbeat handles node heartbeat
 func (s *AgentService) Heartbeat(ctx context.Context, req *pbv1.HeartbeatRequest) (*pbv1.HeartbeatResponse, error) {
 	s.logger.Debug("Heartbeat called", zap.String("node_id", req.NodeId))
-	
+
 	if req.NodeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
-	
+
 	// Update node last seen time and status
 	s.nodesMux.Lock()
 	if node, exists := s.nodes[req.NodeId]; exists {
@@ -128,10 +128,10 @@ func (s *AgentService) Heartbeat(ctx context.Context, req *pbv1.HeartbeatRequest
 		return nil, status.Error(codes.NotFound, "node not registered")
 	}
 	s.nodesMux.Unlock()
-	
+
 	// Get pending commands
 	commands := s.getPendingCommands(req.NodeId)
-	
+
 	return &pbv1.HeartbeatResponse{
 		Success:         true,
 		PendingCommands: commands,
@@ -141,11 +141,11 @@ func (s *AgentService) Heartbeat(ctx context.Context, req *pbv1.HeartbeatRequest
 // ReportMetrics handles metrics reporting from nodes
 func (s *AgentService) ReportMetrics(ctx context.Context, req *pbv1.ReportMetricsRequest) (*pbv1.ReportMetricsResponse, error) {
 	s.logger.Debug("ReportMetrics called", zap.String("node_id", req.NodeId))
-	
+
 	if req.NodeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
-	
+
 	// Update node metrics
 	s.nodesMux.Lock()
 	if node, exists := s.nodes[req.NodeId]; exists {
@@ -153,9 +153,9 @@ func (s *AgentService) ReportMetrics(ctx context.Context, req *pbv1.ReportMetric
 		node.LastSeen = time.Now()
 	}
 	s.nodesMux.Unlock()
-	
+
 	// TODO: Store metrics in database
-	
+
 	return &pbv1.ReportMetricsResponse{
 		Success: true,
 		Message: "metrics received",
@@ -164,18 +164,18 @@ func (s *AgentService) ReportMetrics(ctx context.Context, req *pbv1.ReportMetric
 
 // ReportTraffic handles traffic reporting from nodes
 func (s *AgentService) ReportTraffic(ctx context.Context, req *pbv1.ReportTrafficRequest) (*pbv1.ReportTrafficResponse, error) {
-	s.logger.Debug("ReportTraffic called", 
+	s.logger.Debug("ReportTraffic called",
 		zap.String("node_id", req.NodeId),
 		zap.Int("traffic_entries", len(req.UserTraffic)),
 	)
-	
+
 	if req.NodeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
-	
+
 	// TODO: Store traffic data in database
 	// TODO: Check traffic limits and generate alerts
-	
+
 	return &pbv1.ReportTrafficResponse{
 		Success: true,
 		Message: "traffic data received",
@@ -185,14 +185,14 @@ func (s *AgentService) ReportTraffic(ctx context.Context, req *pbv1.ReportTraffi
 // UpdateConfig handles configuration updates for nodes
 func (s *AgentService) UpdateConfig(ctx context.Context, req *pbv1.UpdateConfigRequest) (*pbv1.UpdateConfigResponse, error) {
 	s.logger.Debug("UpdateConfig called", zap.String("node_id", req.NodeId))
-	
+
 	if req.NodeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
-	
+
 	// TODO: Validate and store configuration
 	// TODO: Notify node about config update
-	
+
 	return &pbv1.UpdateConfigResponse{
 		Success:        true,
 		Message:        "configuration updated",
@@ -202,22 +202,22 @@ func (s *AgentService) UpdateConfig(ctx context.Context, req *pbv1.UpdateConfigR
 
 // ExecuteUserCommand handles user management commands
 func (s *AgentService) ExecuteUserCommand(ctx context.Context, req *pbv1.ExecuteUserCommandRequest) (*pbv1.ExecuteUserCommandResponse, error) {
-	s.logger.Debug("ExecuteUserCommand called", 
+	s.logger.Debug("ExecuteUserCommand called",
 		zap.String("node_id", req.NodeId),
 		zap.String("command_type", req.Command.Type.String()),
 		zap.String("user_id", req.Command.UserId),
 	)
-	
+
 	if req.NodeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
-	
+
 	if req.Command == nil {
 		return nil, status.Error(codes.InvalidArgument, "command is required")
 	}
-	
+
 	// TODO: Execute user command on the specified node
-	
+
 	return &pbv1.ExecuteUserCommandResponse{
 		Success: false,
 		Message: "not implemented",
@@ -228,11 +228,11 @@ func (s *AgentService) ExecuteUserCommand(ctx context.Context, req *pbv1.Execute
 // RestartSingBox handles sing-box restart requests
 func (s *AgentService) RestartSingBox(ctx context.Context, req *pbv1.RestartSingBoxRequest) (*pbv1.RestartSingBoxResponse, error) {
 	s.logger.Debug("RestartSingBox called", zap.String("node_id", req.NodeId))
-	
+
 	if req.NodeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
-	
+
 	// Add restart command to node's command queue
 	command := &pbv1.PendingCommand{
 		CommandId: generateCommandID(),
@@ -246,11 +246,11 @@ func (s *AgentService) RestartSingBox(ctx context.Context, req *pbv1.RestartSing
 		},
 		CreatedAt: timestamppb.Now(),
 	}
-	
+
 	if err := s.sendCommandToNode(req.NodeId, command); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send restart command: %v", err)
 	}
-	
+
 	return &pbv1.RestartSingBoxResponse{
 		Success: true,
 		Message: "restart command sent",
@@ -260,19 +260,19 @@ func (s *AgentService) RestartSingBox(ctx context.Context, req *pbv1.RestartSing
 // GetNodeStatus gets the current status of a node
 func (s *AgentService) GetNodeStatus(ctx context.Context, req *pbv1.GetNodeStatusRequest) (*pbv1.GetNodeStatusResponse, error) {
 	s.logger.Debug("GetNodeStatus called", zap.String("node_id", req.NodeId))
-	
+
 	if req.NodeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
-	
+
 	s.nodesMux.RLock()
 	node, exists := s.nodes[req.NodeId]
 	s.nodesMux.RUnlock()
-	
+
 	if !exists {
 		return nil, status.Error(codes.NotFound, "node not found")
 	}
-	
+
 	return &pbv1.GetNodeStatusResponse{
 		Status:        node.Status,
 		Metrics:       node.Metrics,
@@ -287,13 +287,13 @@ func (s *AgentService) getPendingCommands(nodeID string) []*pbv1.PendingCommand 
 	s.queuesMux.RLock()
 	queue, exists := s.commandQueues[nodeID]
 	s.queuesMux.RUnlock()
-	
+
 	if !exists {
 		return nil
 	}
-	
+
 	var commands []*pbv1.PendingCommand
-	
+
 	// Non-blocking read of available commands
 	for {
 		select {
@@ -311,11 +311,11 @@ func (s *AgentService) sendCommandToNode(nodeID string, command *pbv1.PendingCom
 	s.queuesMux.RLock()
 	queue, exists := s.commandQueues[nodeID]
 	s.queuesMux.RUnlock()
-	
+
 	if !exists {
 		return status.Errorf(codes.NotFound, "node %s not found", nodeID)
 	}
-	
+
 	select {
 	case queue <- command:
 		return nil
@@ -328,7 +328,7 @@ func (s *AgentService) sendCommandToNode(nodeID string, command *pbv1.PendingCom
 func (s *AgentService) cleanupOfflineNodes(ctx context.Context) {
 	ticker := time.NewTicker(s.config.Business.Node.ConfigSyncInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -343,16 +343,16 @@ func (s *AgentService) cleanupOfflineNodes(ctx context.Context) {
 func (s *AgentService) performCleanup() {
 	maxOfflineTime := s.config.Business.Node.MaxOfflineTime
 	cutoff := time.Now().Add(-maxOfflineTime)
-	
+
 	s.nodesMux.Lock()
 	for nodeID, node := range s.nodes {
 		if node.LastSeen.Before(cutoff) {
-			s.logger.Info("removing offline node", 
+			s.logger.Info("removing offline node",
 				zap.String("node_id", nodeID),
 				zap.Time("last_seen", node.LastSeen),
 			)
 			delete(s.nodes, nodeID)
-			
+
 			// Close command queue
 			s.queuesMux.Lock()
 			if queue, exists := s.commandQueues[nodeID]; exists {
@@ -369,7 +369,7 @@ func (s *AgentService) performCleanup() {
 func (s *AgentService) GetNodeStates() map[string]*NodeState {
 	s.nodesMux.RLock()
 	defer s.nodesMux.RUnlock()
-	
+
 	states := make(map[string]*NodeState)
 	for nodeID, state := range s.nodes {
 		// Create a copy to avoid race conditions
@@ -380,7 +380,7 @@ func (s *AgentService) GetNodeStates() map[string]*NodeState {
 			Metrics:  state.Metrics,
 		}
 	}
-	
+
 	return states
 }
 

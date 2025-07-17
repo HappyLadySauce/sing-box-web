@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: AgentConfig
+
+# Node information
+node:
+  nodeId: "node-001"
+  nodeName: "Node-001"
+  region: "us-east-1"
+  tags:
+    - "production"
+    - "frontend"
+  maxUsers: 1000
+  description: "Production frontend node"
+
+# API server connection
+apiServer:
+  address: "localhost"
+  port: 8081
+  timeout: 10s
+  insecure: true
+  certFile: ""
+  keyFile: ""
+  caFile: ""
+
+# sing-box configuration
+singBox:
+  binaryPath: "/usr/local/bin/sing-box"
+  configPath: "/etc/sing-box/config.json"
+  restartDelay: 5s
+  clashApi:
+    enabled: true
+    address: "127.0.0.1"
+    port: 9090
+    secret: "your-clash-api-secret"
+
+# Monitor configuration
+monitor:
+  systemMetricsInterval: 30s
+  trafficReportInterval: 10s
+  heartbeatInterval: 30s
+  localCacheFlushInterval: 1m
+  localCacheSize: 1000
+  retryBackoff: 1s
+  retryTimeout: 30s
+  maxRetries: 3
+
+# Logging configuration
+log:
+  level: "info"
+  format: "json"
+  output: "stdout"
+  maxSize: 100
+  maxAge: 7
+  maxBackups: 3
+  compress: true
+
+# Metrics configuration
+metrics:
+  enabled: true
+  address: "0.0.0.0"
+  port: 9092
+  path: "/metrics"
+
+# SkyWalking configuration
+skywalking:
+  enabled: false
+  collector: "localhost:11800"
+  serviceName: "sing-box-agent"
+  sampleRate: 1
