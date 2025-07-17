@@ -1,0 +1,339 @@
+syntax = "proto3";
+
+package api.v1;
+
+option go_package = "sing-box-web/api/v1;v1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// Management service - 管理API服务，供sing-box-web调用
+service ManagementService {
+  // 节点管理
+  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
+  rpc GetNode(GetNodeRequest) returns (GetNodeResponse);
+  rpc RemoveNode(RemoveNodeRequest) returns (RemoveNodeResponse);
+  rpc UpdateNodeConfig(UpdateNodeConfigRequest) returns (UpdateNodeConfigResponse);
+  
+  // 用户管理
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  
+  // 流量统计
+  rpc GetUserTraffic(GetUserTrafficRequest) returns (GetUserTrafficResponse);
+  rpc GetNodeTraffic(GetNodeTrafficRequest) returns (GetNodeTrafficResponse);
+  
+  // 监控数据
+  rpc GetNodeMetrics(GetNodeMetricsRequest) returns (GetNodeMetricsResponse);
+  rpc GetSystemOverview(google.protobuf.Empty) returns (GetSystemOverviewResponse);
+  
+  // 配置管理
+  rpc UpdateGlobalConfig(UpdateGlobalConfigRequest) returns (UpdateGlobalConfigResponse);
+  rpc GetGlobalConfig(google.protobuf.Empty) returns (GetGlobalConfigResponse);
+  
+  // 批量操作
+  rpc BatchUserOperation(BatchUserOperationRequest) returns (BatchUserOperationResponse);
+}
+
+// 节点管理相关
+message ListNodesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string status_filter = 3; // all, online, offline, error
+}
+
+message ListNodesResponse {
+  repeated NodeInfo nodes = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message GetNodeRequest {
+  string node_id = 1;
+}
+
+message GetNodeResponse {
+  NodeInfo node = 1;
+}
+
+message RemoveNodeRequest {
+  string node_id = 1;
+  bool force = 2;
+}
+
+message RemoveNodeResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message UpdateNodeConfigRequest {
+  string node_id = 1;
+  string config_content = 2;
+  bool restart_required = 3;
+}
+
+message UpdateNodeConfigResponse {
+  bool success = 1;
+  string message = 2;
+  string config_version = 3;
+}
+
+// 用户管理相关
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+  int64 plan_id = 4;
+  repeated string allowed_nodes = 5;
+  map<string, string> metadata = 6;
+}
+
+message CreateUserResponse {
+  bool success = 1;
+  string message = 2;
+  UserInfo user = 3;
+}
+
+message UpdateUserRequest {
+  string user_id = 1;
+  string username = 2;
+  string email = 3;
+  string password = 4;
+  int64 plan_id = 5;
+  repeated string allowed_nodes = 6;
+  string status = 7; // active, suspended, expired
+  map<string, string> metadata = 8;
+}
+
+message UpdateUserResponse {
+  bool success = 1;
+  string message = 2;
+  UserInfo user = 3;
+}
+
+message DeleteUserRequest {
+  string user_id = 1;
+  bool hard_delete = 2; // true: 完全删除, false: 软删除
+}
+
+message DeleteUserResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  UserInfo user = 1;
+}
+
+message ListUsersRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string status_filter = 3; // all, active, suspended, expired
+  string search_keyword = 4;
+}
+
+message ListUsersResponse {
+  repeated UserInfo users = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// 流量统计相关
+message GetUserTrafficRequest {
+  string user_id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  string granularity = 4; // hour, day, month
+}
+
+message GetUserTrafficResponse {
+  repeated TrafficData traffic_data = 1;
+  int64 total_upload = 2;
+  int64 total_download = 3;
+}
+
+message GetNodeTrafficRequest {
+  string node_id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  string granularity = 4;
+}
+
+message GetNodeTrafficResponse {
+  repeated TrafficData traffic_data = 1;
+  int64 total_upload = 2;
+  int64 total_download = 3;
+}
+
+// 监控数据相关
+message GetNodeMetricsRequest {
+  string node_id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  string granularity = 4;
+}
+
+message GetNodeMetricsResponse {
+  repeated MetricsData metrics_data = 1;
+  NodeMetricsInfo current_metrics = 2;
+}
+
+message GetSystemOverviewResponse {
+  SystemStats stats = 1;
+  repeated NodeSummary node_summaries = 2;
+  repeated AlertInfo recent_alerts = 3;
+}
+
+// 配置管理相关
+message UpdateGlobalConfigRequest {
+  map<string, string> config = 1;
+  string version = 2;
+}
+
+message UpdateGlobalConfigResponse {
+  bool success = 1;
+  string message = 2;
+  string new_version = 3;
+}
+
+message GetGlobalConfigResponse {
+  map<string, string> config = 1;
+  string version = 2;
+}
+
+// 批量操作相关
+message BatchUserOperationRequest {
+  enum OperationType {
+    ENABLE = 0;
+    DISABLE = 1;
+    DELETE = 2;
+    RESET_TRAFFIC = 3;
+    UPDATE_PLAN = 4;
+  }
+  
+  OperationType operation = 1;
+  repeated string user_ids = 2;
+  map<string, string> parameters = 3;
+}
+
+message BatchUserOperationResponse {
+  bool success = 1;
+  string message = 2;
+  repeated OperationResult results = 3;
+}
+
+// 数据结构定义
+message NodeInfo {
+  string node_id = 1;
+  string node_name = 2;
+  string node_ip = 3;
+  string status = 4;
+  string version = 5;
+  google.protobuf.Timestamp last_seen = 6;
+  NodeCapability capability = 7;
+  NodeMetricsInfo current_metrics = 8;
+  int32 user_count = 9;
+  string config_version = 10;
+}
+
+message UserInfo {
+  string user_id = 1;
+  string username = 2;
+  string email = 3;
+  string status = 4;
+  int64 plan_id = 5;
+  string plan_name = 6;
+  repeated string allowed_nodes = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  google.protobuf.Timestamp expires_at = 10;
+  TrafficSummary traffic_summary = 11;
+  map<string, string> metadata = 12;
+}
+
+message TrafficData {
+  google.protobuf.Timestamp timestamp = 1;
+  int64 upload_bytes = 2;
+  int64 download_bytes = 3;
+  string node_id = 4;
+}
+
+message MetricsData {
+  google.protobuf.Timestamp timestamp = 1;
+  double cpu_usage = 2;
+  double memory_usage = 3;
+  double disk_usage = 4;
+  int64 network_in = 5;
+  int64 network_out = 6;
+  int32 connections = 7;
+}
+
+message NodeMetricsInfo {
+  double cpu_usage_percent = 1;
+  double memory_usage_percent = 2;
+  double disk_usage_percent = 3;
+  int64 network_in_bytes_per_sec = 4;
+  int64 network_out_bytes_per_sec = 5;
+  int32 active_connections = 6;
+  double load_average = 7;
+  google.protobuf.Timestamp timestamp = 8;
+}
+
+message SystemStats {
+  int32 total_nodes = 1;
+  int32 online_nodes = 2;
+  int32 total_users = 3;
+  int32 active_users = 4;
+  int64 total_traffic_today = 5;
+  int32 total_connections = 6;
+  double avg_cpu_usage = 7;
+  double avg_memory_usage = 8;
+}
+
+message NodeSummary {
+  string node_id = 1;
+  string node_name = 2;
+  string status = 3;
+  int32 user_count = 4;
+  int32 connection_count = 5;
+  double cpu_usage = 6;
+}
+
+message AlertInfo {
+  string alert_id = 1;
+  string type = 2;
+  string severity = 3;
+  string message = 4;
+  string node_id = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message TrafficSummary {
+  int64 used_bytes = 1;
+  int64 total_bytes = 2;
+  double usage_percent = 3;
+  int64 daily_usage = 4;
+}
+
+message OperationResult {
+  string user_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+// 复用agent.proto中的NodeCapability
+message NodeCapability {
+  int32 max_connections = 1;
+  int64 max_bandwidth_mbps = 2;
+  repeated string supported_protocols = 3;
+  map<string, string> features = 4;
+}

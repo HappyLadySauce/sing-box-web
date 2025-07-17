@@ -1,0 +1,187 @@
+syntax = "proto3";
+
+package api.v1;
+
+option go_package = "sing-box-web/api/v1;v1";
+
+import "google/protobuf/timestamp.proto";
+
+// Agent service - 节点代理gRPC服务
+service AgentService {
+  // 节点注册
+  rpc RegisterNode(RegisterNodeRequest) returns (RegisterNodeResponse);
+  
+  // 心跳保持
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  
+  // 上报监控数据
+  rpc ReportMetrics(ReportMetricsRequest) returns (ReportMetricsResponse);
+  
+  // 上报用户流量数据
+  rpc ReportTraffic(ReportTrafficRequest) returns (ReportTrafficResponse);
+  
+  // 接收配置更新
+  rpc UpdateConfig(UpdateConfigRequest) returns (UpdateConfigResponse);
+  
+  // 执行用户管理命令
+  rpc ExecuteUserCommand(ExecuteUserCommandRequest) returns (ExecuteUserCommandResponse);
+  
+  // 重启sing-box服务
+  rpc RestartSingBox(RestartSingBoxRequest) returns (RestartSingBoxResponse);
+  
+  // 获取节点状态
+  rpc GetNodeStatus(GetNodeStatusRequest) returns (GetNodeStatusResponse);
+}
+
+// 节点注册请求
+message RegisterNodeRequest {
+  string node_id = 1;
+  string node_name = 2;
+  string node_ip = 3;
+  NodeCapability capability = 4;
+  string version = 5;
+}
+
+message RegisterNodeResponse {
+  bool success = 1;
+  string message = 2;
+  string assigned_config_url = 3;
+}
+
+// 心跳请求
+message HeartbeatRequest {
+  string node_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  NodeStatus status = 3;
+}
+
+message HeartbeatResponse {
+  bool success = 1;
+  repeated PendingCommand pending_commands = 2;
+}
+
+// 监控数据上报
+message ReportMetricsRequest {
+  string node_id = 1;
+  NodeMetrics metrics = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message ReportMetricsResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// 流量数据上报
+message ReportTrafficRequest {
+  string node_id = 1;
+  repeated UserTraffic user_traffic = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message ReportTrafficResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// 配置更新
+message UpdateConfigRequest {
+  string node_id = 1;
+  string config_content = 2;
+  string config_version = 3;
+}
+
+message UpdateConfigResponse {
+  bool success = 1;
+  string message = 2;
+  string applied_version = 3;
+}
+
+// 用户管理命令
+message ExecuteUserCommandRequest {
+  string node_id = 1;
+  UserCommand command = 2;
+}
+
+message ExecuteUserCommandResponse {
+  bool success = 1;
+  string message = 2;
+  string result = 3;
+}
+
+// 重启服务
+message RestartSingBoxRequest {
+  string node_id = 1;
+  string reason = 2;
+}
+
+message RestartSingBoxResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// 获取节点状态
+message GetNodeStatusRequest {
+  string node_id = 1;
+}
+
+message GetNodeStatusResponse {
+  NodeStatus status = 1;
+  NodeMetrics metrics = 2;
+  string config_version = 3;
+}
+
+// 数据结构定义
+message NodeCapability {
+  int32 max_connections = 1;
+  int64 max_bandwidth_mbps = 2;
+  repeated string supported_protocols = 3;
+  map<string, string> features = 4;
+}
+
+message NodeStatus {
+  string status = 1; // online, offline, error, maintenance
+  string sing_box_version = 2;
+  google.protobuf.Timestamp last_restart = 3;
+  int32 active_connections = 4;
+  string error_message = 5;
+}
+
+message NodeMetrics {
+  double cpu_usage_percent = 1;
+  double memory_usage_percent = 2;
+  double disk_usage_percent = 3;
+  int64 network_in_bytes_per_sec = 4;
+  int64 network_out_bytes_per_sec = 5;
+  int32 active_connections = 6;
+  double load_average = 7;
+}
+
+message UserTraffic {
+  string user_id = 1;
+  int64 upload_bytes = 2;
+  int64 download_bytes = 3;
+  google.protobuf.Timestamp start_time = 4;
+  google.protobuf.Timestamp end_time = 5;
+}
+
+message UserCommand {
+  enum CommandType {
+    ADD_USER = 0;
+    REMOVE_USER = 1;
+    UPDATE_USER = 2;
+    ENABLE_USER = 3;
+    DISABLE_USER = 4;
+    RESET_TRAFFIC = 5;
+  }
+  
+  CommandType type = 1;
+  string user_id = 2;
+  map<string, string> parameters = 3;
+}
+
+message PendingCommand {
+  string command_id = 1;
+  UserCommand command = 2;
+  google.protobuf.Timestamp created_at = 3;
+}

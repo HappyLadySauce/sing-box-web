@@ -1,523 +1,336 @@
-# sing-box-web 项目开发 Todo 清单
+# Distributed sing-box Management Platform - Development Plan
 
-## 🚀 项目状态
-- [x] 需求分析阶段
-- [x] 架构设计阶段
-- [x] 项目启动阶段
-- [x] 基础设施搭建阶段 ✅ **[第一阶段完成]**
-- [ ] MVP 开发阶段 🚀 **[第二阶段进行中]**
-- [ ] 测试验证阶段
-- [ ] 生产部署阶段
+## Project Overview
+A lightweight, high-availability distributed sing-box management platform based on gRPC, developed in Go, supporting node management, user management, traffic statistics, monitoring and alerting.
 
 ---
 
-## 🏗️ 项目架构说明
+## Phase 1: Infrastructure Setup (Week 1-2)
 
-### 应用职责分工
-- **sing-box-web**: 前端服务器、用户管理、登录认证、操作日志记录、与前端通信
-- **sing-box-api**: 分布式节点管理、与Agent通信、核心业务逻辑、数据存储
-- **sing-box-agent**: sing-box进程管理、配置文件管理、systemctl控制、Clash API集成
+### 1.1 Project Structure & Environment
+- [x] Complete project directory structure design
+- [x] Create gRPC protobuf definition files
+- [x] Complete architecture design documentation
+- [ ] Configure development environment and toolchain
+  - [ ] Setup protobuf compilation environment
+  - [ ] Setup Makefile build scripts
+  - [ ] Configure Go module dependency management
+  - [ ] Setup code formatting and linting tools
 
-### 数据流向
-```
-前端 ↔ sing-box-web ↔ sing-box-api ↔ sing-box-agent ↔ sing-box进程
-```
+### 1.2 Core Framework
+- [ ] Implement pkg/config configuration management module
+  - [ ] Create versioned configuration structure (v1)
+  - [ ] Implement configuration validation logic
+  - [ ] Support YAML/JSON configuration files
+  - [ ] Configuration default value settings
+- [ ] Implement pkg/logger logging module
+  - [ ] Integrate Zap structured logging
+  - [ ] Support log level configuration
+  - [ ] Support log file rotation
+- [ ] Implement pkg/metrics monitoring metrics module
+  - [ ] Integrate Prometheus client
+  - [ ] Define core business metrics
+  - [ ] Implement metrics collector
 
----
-
-## ✅ 已完成的设计工作
-
-### 📋 项目规划与架构设计 
-- [x] **技术选型完成** - 详见 `Tech_Stack.md`
-  - [x] 核心语言选择：Go 1.21+
-  - [x] Web框架选择：Gin（三个应用统一）
-  - [x] RPC框架选择：gRPC（内部通信）
-  - [x] 数据库选择：PostgreSQL + Redis + TimescaleDB
-  - [x] 监控方案：Prometheus + Grafana + SkyWalking
-  - [x] Clash API集成技术方案
-- [x] **代码结构设计完成** - 详见 `Code_Structure.md`
-  - [x] 三应用架构完整目录结构规划
-  - [x] 模块划分和依赖关系（删除ctl应用）
-  - [x] Clash API集成架构设计
-  - [x] 开发规范和最佳实践
-- [x] **数据库设计完成** - 详见 `DB_Schema.md`
-  - [x] 应用数据职责分工（Web/API数据库分离）
-  - [x] 核心数据表设计（用户认证、节点管理、监控等）
-  - [x] 时序数据库设计（TimescaleDB）
-  - [x] 索引优化和分区策略
-  - [x] 数据安全和备份方案
-- [x] **API 接口设计完成** - 详见 `API_Spec.md`
-  - [x] sing-box-web REST API（用户认证、操作审计、API代理）
-  - [x] sing-box-api gRPC服务（节点管理、配置管理、监控数据）
-  - [x] Clash API集成设计（代理转发、状态管理）
-  - [x] WebSocket实时通信接口
-  - [x] OpenAPI 3.0 规范定义
+### 1.3 gRPC Service Framework
+- [ ] Generate protobuf Go code
+- [ ] Implement gRPC server framework
+  - [ ] AgentService server framework
+  - [ ] ManagementService server framework
+- [ ] Implement gRPC client framework
+  - [ ] gRPC connection manager
+  - [ ] Client reconnection logic
+  - [ ] Client load balancing
 
 ---
 
-## 📋 第一阶段：项目初始化与基础设施 (Week 1-2) ✅
+## Phase 2: Web Service Development (Week 3-4)
 
-### 🏗️ 项目结构搭建
-- [x] 初始化 Go module (`go mod init sing-box-web`)
-- [x] 创建完整的目录结构（参考 Code_Structure.md）
-  - [x] `cmd/` - 应用程序入口（sing-box-web、sing-box-api、sing-box-agent）
-  - [x] `internal/` - 内部应用代码
-  - [x] `pkg/` - 公共库代码
-  - [x] `api/` - API 定义和生成代码
-  - [x] `configs/` - 配置文件
-- [x] 设置 `.gitignore` 文件
-- [x] 创建基础 `Makefile`
-- [x] 配置开发工具
-  - [x] `.golangci.yml` 配置
-  - [x] `.editorconfig` 配置
+### 2.1 sing-box-web Basic Framework
+- [ ] Implement command line application framework
+  - [ ] Cobra command line structure
+  - [ ] Option parameter validation
+  - [ ] Graceful startup/shutdown
+- [ ] Implement Gin Web server
+  - [ ] Router initialization
+  - [ ] Middleware registration mechanism
+  - [ ] Automatic route registration
+- [ ] Implement authentication authorization module
+  - [ ] JWT token management
+  - [ ] RBAC permission control
+  - [ ] User session management
 
-### 🛠️ 开发工具安装
-- [x] 安装 Go 1.23.6+
-- [x] 安装开发工具 (`make install-tools`)
-  - [x] `golangci-lint` - 代码检查
-  - [x] `mockgen` - Mock 生成
-  - [x] `buf` - Protocol Buffers 工具
-  - [x] `protoc-gen-go` - Go 代码生成
-  - [x] `protoc-gen-go-grpc` - gRPC 代码生成
-  - [x] `goimports` - Go 代码格式化
-  - [🔄] `go-agent` - SkyWalking Go Agent (链路追踪) **[后期打包时处理]**
-- [🔄] 验证工具安装 (`make check-skywalking`) **[后期打包时处理]**
+### 2.2 API Type Definition & Routes
+- [ ] Improve API type definitions
+  - [ ] Common general types
+  - [ ] v1 version API types
+  - [ ] Request/response structures
+- [ ] Implement core business routes
+  - [ ] User authentication routes (/auth)
+  - [ ] Node management routes (/nodes)
+  - [ ] User management routes (/users)
+  - [ ] Traffic statistics routes (/traffic)
+  - [ ] System monitoring routes (/metrics)
 
-### 📝 基础配置
-- [x] 创建配置文件结构
-  - [x] `configs/api/config.yaml` - API服务器配置
-  - [x] `configs/web/config.yaml` - Web服务器配置
-  - [x] `configs/agent/config.yaml` - Agent配置
-- [x] 实现配置管理器 (`pkg/config/`)
-- [x] 设置日志系统 (`pkg/logger/`)
-- [x] 创建版本信息管理 (`pkg/version/`)
-
-### 🔧 核心应用框架
-- [x] 完成 `cmd/sing-box-web/main.go` - Web服务器入口
-- [x] 完成 `cmd/sing-box-api/main.go` - API服务器入口
-- [x] 完成 `cmd/sing-box-agent/main.go` - Agent入口
-
-### ✅ 第一阶段完成验证
-- [x] 项目成功构建 - 三个应用二进制文件生成
-- [x] 基础框架功能正常 - 命令行参数、日志系统、配置管理
-- [x] 代码质量检查通过 - golangci-lint、格式化工具
-- [x] 开发环境搭建完成 - 支持本地开发和调试
+### 2.3 Database Integration
+- [ ] Design database models
+  - [ ] User table design
+  - [ ] Node table design
+  - [ ] Traffic record table design
+  - [ ] Plan table design
+- [ ] Implement GORM data access layer
+  - [ ] Database connection management
+  - [ ] Model definition and migration
+  - [ ] Data access interfaces
+  - [ ] Transaction management
 
 ---
 
-## 💾 第二阶段：数据库与存储 (Week 2-3)
+## Phase 3: API Service Development (Week 5-6)
 
-### 🗄️ 数据库设计实现
-- [ ] 设置数据库驱动 (`pkg/database/`)
-  - [ ] PostgreSQL 驱动实现
-  - [ ] SQLite 驱动实现（用于开发环境）
-- [ ] 创建数据库迁移系统
-  - [ ] 迁移框架实现 (`internal/api/repository/migration/`)
-  - [ ] 初始化迁移脚本 `001_initial_schema.up.sql`
-- [ ] 实现核心数据表
-  - [ ] 用户表 (`users`)
-  - [ ] 会话表 (`user_sessions`)
-  - [ ] 节点表 (`nodes`)
-  - [ ] 配置模板表 (`config_templates`)
-  - [ ] 配置部署记录表 (`node_config_deployments`)
-  - [ ] 监控数据表 (`node_metrics`)
-  - [ ] 系统设置表 (`system_settings`)
-  - [ ] 审计日志表 (`audit_logs`)
+### 3.1 sing-box-api gRPC Service
+- [ ] Implement ManagementService
+  - [ ] Node management interface implementation
+  - [ ] User management interface implementation
+  - [ ] Traffic statistics interface implementation
+  - [ ] Monitoring data interface implementation
+  - [ ] Batch operation interface implementation
+- [ ] Implement AgentService
+  - [ ] Node registration interface implementation
+  - [ ] Heartbeat maintenance interface implementation
+  - [ ] Data reporting interface implementation
+  - [ ] Configuration distribution interface implementation
+  - [ ] Command execution interface implementation
 
-### 📊 数据访问层
-- [ ] 实现仓库接口 (`internal/api/repository/interfaces.go`)
-- [ ] 用户数据仓库 (`internal/api/repository/user/`)
-- [ ] 节点数据仓库 (`internal/api/repository/node/`)
-- [ ] 配置数据仓库 (`internal/api/repository/config/`)
-- [ ] 监控数据仓库 (`internal/api/repository/metrics/`)
+### 3.2 Business Logic Implementation
+- [ ] Node management business logic
+  - [ ] Node registration and validation
+  - [ ] Node status management
+  - [ ] Node configuration management
+  - [ ] Node monitoring and alerting
+- [ ] User management business logic
+  - [ ] User CRUD operations
+  - [ ] User status management
+  - [ ] User permission control
+  - [ ] Batch user operations
 
-### 🔄 缓存系统
-- [ ] Redis 客户端实现 (`pkg/cache/redis/`)
-- [ ] 内存缓存实现 (`pkg/cache/memory/`)
-- [ ] 缓存接口定义 (`pkg/cache/interfaces.go`)
-- [ ] 会话缓存
-- [ ] 监控数据缓存
-- [ ] 分布式锁实现
-
----
-
-## 🔐 第三阶段：认证与安全 (Week 3-4)
-
-### 👤 用户认证系统
-- [ ] JWT 认证实现 (`pkg/auth/jwt/`)
-  - [ ] Token 生成和验证
-  - [ ] Refresh Token 机制
-- [ ] 密码安全 (`pkg/auth/bcrypt/`)
-  - [ ] 密码哈希
-  - [ ] 密码验证
-- [ ] 中间件实现
-  - [ ] JWT 认证中间件
-  - [ ] 权限验证中间件
-  - [ ] 请求ID中间件
-  - [ ] 审计日志中间件
-
-### 🛡️ 安全加固
-- [ ] CORS 配置
-- [ ] 限流中间件
-- [ ] 输入验证 (`pkg/validation/`)
-- [ ] 敏感数据加密 (`pkg/crypto/`)
-- [ ] SQL 注入防护
-- [ ] XSS 防护
+### 3.3 Data Processing & Storage
+- [ ] Traffic data processing
+  - [ ] Traffic data aggregation
+  - [ ] Traffic limit checking
+  - [ ] Traffic statistics reports
+- [ ] Monitoring data processing
+  - [ ] Metrics data aggregation
+  - [ ] Alert rule engine
+  - [ ] Monitoring data storage
 
 ---
 
-## 🌐 第四阶段：API 接口开发 (Week 4-6)
+## Phase 4: Agent Service Development (Week 7-8)
 
-### 📡 Protocol Buffers 定义
-- [ ] 创建 Proto 文件
-  - [ ] `api/proto/common/v1/common.proto`
-  - [ ] `api/proto/manager/v1/service.proto`
-  - [ ] `api/proto/agent/v1/service.proto`
-- [ ] 生成 Go 代码
-- [ ] 生成 OpenAPI 文档
+### 4.1 sing-box-agent Basic Framework
+- [ ] Implement Agent command line application
+  - [ ] Cobra command line structure
+  - [ ] Configuration file parsing
+  - [ ] Daemon process mode
+- [ ] Implement gRPC client connection
+  - [ ] Connection management and reconnection
+  - [ ] Health check mechanism
+  - [ ] Error handling and retry
 
-### 🔌 gRPC 服务实现 (sing-box-api)
-- [ ] Manager 服务实现 (`internal/api/server/grpc/`)
-  - [ ] Agent 双向流连接
-  - [ ] 节点管理接口
-  - [ ] 配置管理接口
-  - [ ] 监控数据接口
-- [ ] gRPC 拦截器
-  - [ ] 认证拦截器
-  - [ ] 日志拦截器
-  - [ ] 监控拦截器
-  - [ ] 恢复拦截器
+### 4.2 Core Functionality Implementation
+- [ ] Node registration and heartbeat
+  - [ ] Node information collection
+  - [ ] Scheduled heartbeat sending
+  - [ ] Status synchronization mechanism
+- [ ] Monitoring data collection
+  - [ ] System resource monitoring
+  - [ ] sing-box status monitoring
+  - [ ] Connection data statistics
+- [ ] Traffic data reporting
+  - [ ] User traffic statistics
+  - [ ] Real-time data reporting
+  - [ ] Local data caching
 
-### 🌍 Web服务器 REST API (sing-box-web)
-- [ ] HTTP 服务器实现 (`internal/web/server/http/`)
-- [ ] 路由配置 (`internal/web/server/http/router.go`)
-- [ ] 业务处理器实现
-  - [ ] 用户认证处理器 (`/auth/*`)
-  - [ ] 用户管理处理器 (`/users/*`)
-  - [ ] 操作日志处理器 (`/audit-logs/*`)
-  - [ ] API代理处理器 (代理到sing-box-api)
-  - [ ] 健康检查处理器 (`/health`)
-
-### 🔄 WebSocket 实现 (sing-box-web)
-- [ ] WebSocket Hub (`internal/web/server/websocket/hub.go`)
-- [ ] 客户端连接管理
-- [ ] 实时数据推送
-  - [ ] 节点状态更新
-  - [ ] 监控数据推送
-  - [ ] 部署状态推送
-
----
-
-## 🧠 第五阶段：业务逻辑层 (Week 5-7)
-
-### 🎯 Web服务层 (sing-box-web)
-- [ ] 用户管理服务 (`internal/web/service/user/`)
-  - [ ] 用户注册/登录/登出
-  - [ ] 用户信息管理
-  - [ ] 密码修改
-- [ ] 认证服务 (`internal/web/service/auth/`)
-  - [ ] JWT Token管理
-  - [ ] 会话管理
-  - [ ] 权限验证
-- [ ] 审计日志服务 (`internal/web/service/audit/`)
-  - [ ] 操作日志记录
-  - [ ] 日志查询和导出
-- [ ] API代理服务 (`internal/web/service/proxy/`)
-  - [ ] 请求转发到sing-box-api
-  - [ ] 响应处理和错误转换
-
-### 🎯 API服务层 (sing-box-api)
-- [ ] 节点管理服务 (`internal/api/service/node/`)
-  - [ ] 节点注册
-  - [ ] 节点状态更新
-  - [ ] 节点查询和过滤
-  - [ ] 节点删除
-- [ ] 配置管理服务 (`internal/api/service/config/`)
-  - [ ] 模板创建和更新
-  - [ ] 配置验证
-  - [ ] 配置部署
-  - [ ] 部署状态跟踪
-- [ ] 监控服务 (`internal/api/service/monitoring/`)
-  - [ ] 监控数据收集
-  - [ ] 数据聚合
-  - [ ] 告警处理
-
-### 📊 通知服务 (sing-box-api)
-- [ ] 通知服务实现 (`internal/api/service/notification/`)
-  - [ ] 邮件通知
-  - [ ] Webhook 通知
-  - [ ] 系统消息
+### 4.3 sing-box Management
+- [ ] Configuration management
+  - [ ] Configuration file synchronization
+  - [ ] Configuration version management
+  - [ ] Configuration hot reload
+- [ ] User command execution
+  - [ ] User add/remove
+  - [ ] User status management
+  - [ ] Traffic reset operations
+- [ ] Service management
+  - [ ] sing-box process management
+  - [ ] Service restart control
+  - [ ] Health status checking
 
 ---
 
-## 🤖 第六阶段：Agent 开发 (Week 6-8)
+## Phase 5: Integration Testing & Optimization (Week 9-10)
 
-### 📱 Agent 核心功能
-- [ ] Agent 应用实现 (`cmd/sing-box-agent/`)
-- [ ] gRPC 客户端 (`internal/agent/client/`)
-  - [ ] 连接管理
-  - [ ] 重试逻辑
-  - [ ] 心跳机制
-- [ ] 监控数据收集 (`internal/agent/monitor/`)
-  - [ ] 系统监控（CPU、内存、磁盘、网络）
-  - [ ] sing-box 状态监控
-  - [ ] 日志监控
+### 5.1 Unit Testing
+- [ ] Core module unit tests
+  - [ ] Configuration management tests
+  - [ ] gRPC service tests
+  - [ ] Database operation tests
+  - [ ] Business logic tests
+- [ ] Test coverage improvement
+  - [ ] Achieve 80%+ code coverage
+  - [ ] 100% coverage for critical paths
+  - [ ] Boundary condition testing
 
-### ⚙️ sing-box 进程管理
-- [ ] systemctl 控制器 (`internal/agent/systemctl/`)
-  - [ ] sing-box 服务启动/停止/重启
-  - [ ] 服务状态查询
-  - [ ] 日志获取
-- [ ] 配置管理器 (`internal/agent/config/`)
-  - [ ] 配置文件接收和验证
-  - [ ] 配置文件写入和备份
-  - [ ] 配置热重载
-- [ ] sing-box 控制器 (`internal/agent/singbox/`)
-  - [ ] 进程健康检查
-  - [ ] 性能监控
-  - [ ] 错误处理
+### 5.2 Integration Testing
+- [ ] End-to-end testing
+  - [ ] Web -> API -> Agent complete flow
+  - [ ] User management end-to-end tests
+  - [ ] Traffic statistics end-to-end tests
+  - [ ] Node management end-to-end tests
+- [ ] Performance testing
+  - [ ] gRPC service performance testing
+  - [ ] Database query performance optimization
+  - [ ] Concurrent stress testing
 
-### 🌐 Clash API 集成
-- [ ] Clash API 客户端 (`internal/agent/clash/`)
-  - [ ] API代理实现
-  - [ ] 状态查询接口
-  - [ ] 代理选择器管理
-  - [ ] 模式切换接口
-- [ ] Web界面代理 (`internal/agent/webui/`)
-  - [ ] 静态文件服务
-  - [ ] API请求转发
-  - [ ] 访问控制
-
----
-
-## 🌐 第七阶段：Web 前端服务 (Week 7-8)
-
-### 🖥️ Web 服务器 (sing-box-web)
-- [ ] 静态资源服务 (`internal/web/assets/`)
-  - [ ] 前端文件嵌入 (`embed` 包)
-  - [ ] 资源压缩和缓存
-- [ ] SPA 路由处理 (`internal/web/spa/`)
-  - [ ] 单页应用路由
-  - [ ] 历史模式支持
-- [ ] API 代理中间件
-  - [ ] 请求代理到sing-box-api
-  - [ ] 错误处理和转换
-
-### 🔗 前端集成
-- [ ] 前端构建集成
-  - [ ] 自动化构建流程
-  - [ ] 版本管理
-- [ ] 开发环境配置
-  - [ ] 热重载支持
-  - [ ] 代理配置
+### 5.3 Production Environment Preparation
+- [ ] Containerized deployment
+  - [ ] Dockerfile writing
+  - [ ] Docker Compose configuration
+  - [ ] K8s deployment manifests
+- [ ] Monitoring and alerting configuration
+  - [ ] Prometheus configuration
+  - [ ] Grafana dashboards
+  - [ ] AlertManager alert rules
+- [ ] Documentation improvement
+  - [ ] API documentation
+  - [ ] Deployment documentation
+  - [ ] Operations manual
 
 ---
 
-## 🧪 第八阶段：测试 (Week 8-10)
+## Phase 6: Frontend UI Development (Week 11-12)
 
-### 🔬 单元测试
-- [ ] 测试工具配置 (`pkg/testing/`)
-- [ ] 数据库测试工具
-- [ ] Mock 生成和使用
-- [ ] Web服务层测试
-  - [ ] 用户管理测试
-  - [ ] 认证服务测试
-  - [ ] API代理测试
-- [ ] API服务层测试
-  - [ ] 节点管理测试
-  - [ ] 配置管理测试
-  - [ ] 监控服务测试
-- [ ] Agent测试
-  - [ ] systemctl控制测试
-  - [ ] 配置管理测试
-  - [ ] Clash API集成测试
-- [ ] 仓库层测试
-- [ ] 工具函数测试
+### 6.1 Frontend Framework Setup
+- [ ] Technology stack selection and environment configuration
+  - [ ] Vue.js 3 + TypeScript
+  - [ ] Vite build tool
+  - [ ] Element Plus UI component library
+  - [ ] Pinia state management
+- [ ] Project structure design
+  - [ ] Component design
+  - [ ] Route configuration
+  - [ ] API interface encapsulation
 
-### 🧪 集成测试
-- [ ] Web API 接口测试
-- [ ] gRPC 服务测试
-- [ ] Agent通信测试
-- [ ] 数据库集成测试
-- [ ] Redis 集成测试
-- [ ] Clash API集成测试
+### 6.2 Core Page Development
+- [ ] Authentication login page
+  - [ ] Login form
+  - [ ] JWT Token management
+  - [ ] Permission route guards
+- [ ] Node management page
+  - [ ] Node list display
+  - [ ] Node status monitoring
+  - [ ] Node configuration management
+- [ ] User management page
+  - [ ] User list and search
+  - [ ] User CRUD operations
+  - [ ] Batch operation functionality
+- [ ] Traffic statistics page
+  - [ ] Traffic chart display
+  - [ ] Real-time data updates
+  - [ ] Export functionality
 
-### 📊 性能测试
-- [ ] 压力测试脚本
-- [ ] 并发连接测试
-- [ ] API 性能测试
-- [ ] 数据库性能测试
-- [ ] Agent响应性能测试
-
----
-
-## 📦 第九阶段：部署与运维 (Week 9-11)
-
-### 🐳 容器化
-- [ ] Dockerfile 编写
-  - [ ] sing-box-web Dockerfile
-  - [ ] sing-box-api Dockerfile
-  - [ ] sing-box-agent Dockerfile
-- [ ] 多阶段构建优化
-- [ ] 镜像安全配置
-
-### ☸️ Kubernetes 部署
-- [ ] K8s 部署清单
-  - [ ] Web服务器 Deployment
-  - [ ] API服务器 Deployment
-  - [ ] Agent DaemonSet
-  - [ ] Service 配置
-  - [ ] ConfigMap 和 Secret
-  - [ ] Ingress 配置
-- [ ] Helm Chart（可选）
-
-### 📈 监控与可观测性
-- [ ] Prometheus 指标实现
-  - [ ] Web服务器指标
-  - [ ] API服务器指标
-  - [ ] Agent指标
-  - [ ] 业务指标
-- [ ] Grafana 仪表盘
-  - [ ] 系统监控面板
-  - [ ] 业务监控面板
-  - [ ] Agent状态面板
-- [ ] 日志收集配置
-- [ ] 告警规则配置
-
-### 🔄 CI/CD 流水线
-- [ ] GitHub Actions 配置
-  - [ ] 代码检查流水线
-  - [ ] 测试流水线
-  - [ ] 构建流水线
-  - [ ] 部署流水线
-- [ ] 自动化测试集成
-- [ ] 容器镜像推送
+### 6.3 System Monitoring Interface
+- [ ] System overview page
+  - [ ] Key metrics display
+  - [ ] System status overview
+  - [ ] Quick operation entries
+- [ ] Monitoring dashboard
+  - [ ] Real-time monitoring charts
+  - [ ] Alert information display
+  - [ ] Historical data queries
 
 ---
 
-## 📚 第十阶段：文档与完善 (Week 10-12)
+## Project Milestones
 
-### 📖 文档编写
-- [ ] README.md 完善
-- [ ] API 文档生成
-- [ ] 部署文档
-- [ ] 开发者文档
-- [ ] 用户手册
-- [ ] Clash API集成说明
+### M1: Infrastructure Complete (End of Week 2)
+- Project structure setup complete
+- Core framework modules implemented
+- gRPC service framework ready
 
-### 🛠️ 工具与脚本
-- [ ] 数据库迁移脚本
-- [ ] 部署脚本
-- [ ] 备份恢复脚本
-- [ ] 监控脚本
-- [ ] Agent安装脚本
+### M2: Backend Services Complete (End of Week 6)
+- Web service fully implemented
+- API service fully implemented
+- Core business logic complete
 
-### 🔧 优化与完善
-- [ ] 性能优化
-- [ ] 安全审计
-- [ ] 代码重构
-- [ ] 错误处理完善
-- [ ] Clash API功能增强
+### M3: Agent Service Complete (End of Week 8)
+- Agent service fully implemented
+- Integration with sing-box complete
+- End-to-end flow established
 
----
+### M4: System Integration Complete (End of Week 10)
+- Complete system integration testing
+- Performance optimization complete
+- Production environment ready
 
-## 🎯 额外任务（根据需要）
-
-### 🚀 扩展功能
-- [ ] 多租户支持
-- [ ] 配置模板市场
-- [ ] 自动化测试套件
-- [ ] 国际化支持
-- [ ] Clash API Dashboard集成
-
-### 🔒 安全增强
-- [ ] OAuth2 集成
-- [ ] RBAC 权限系统
-- [ ] API 密钥管理
-- [ ] 安全扫描集成
-
-### 📊 高级监控
-- [ ] 分布式链路追踪
-- [ ] 高级告警规则
-- [ ] 性能分析工具
-- [ ] 自动化故障恢复
+### M5: Product Release Ready (End of Week 12)
+- Frontend UI complete
+- Documentation complete
+- Official version release
 
 ---
 
-## ✅ 里程碑检查点
+## Risk Management
 
-- [ ] **Week 4**: 基础架构完成，三个应用框架搭建完毕
-- [ ] **Week 6**: 核心功能开发完成，基本 API 可用
-- [ ] **Week 8**: Agent 开发完成，端到端功能打通，Clash API集成完成
-- [ ] **Week 10**: 测试完成，产品基本可用
-- [ ] **Week 12**: 部署配置完成，正式发布
+### Technical Risks
+- **gRPC Performance Tuning**: Reserve 1 week for performance optimization
+- **Database Design Changes**: Use versioned migration strategy
+- **sing-box API Changes**: Design adapter pattern to handle changes
 
----
+### Schedule Risks
+- **Dependency Compatibility**: Pre-validate key dependencies
+- **Test Case Coverage**: Develop test cases in parallel
+- **Documentation Lag**: Update documentation synchronized with code development
 
-## 📝 注意事项
-
-1. **架构清晰**: 三个应用职责分明，避免功能重叠
-2. **测试驱动**: 每个功能开发完成后立即编写测试
-3. **文档同步**: 代码开发的同时更新相关文档
-4. **安全优先**: 在开发过程中始终考虑安全问题
-5. **性能考虑**: 关键路径需要进行性能测试和优化
-6. **Clash API**: 重点关注Agent中Clash API的稳定性和性能
-7. **链路追踪**: SkyWalking集成推迟到后期打包阶段，当前专注核心功能开发
-
-## 🎯 当前开发阶段重点
-
-### 第一阶段完成 ✅
-- ✅ 项目基础架构搭建完成
-- ✅ 开发环境配置就绪
-- ✅ 三个核心应用框架运行正常
-- ✅ 代码质量工具链完整
-
-### 即将进入第二阶段 🚀
-**优先级**: 数据库与存储层开发
-- 🎯 PostgreSQL 数据库集成
-- 🎯 Redis 缓存系统
-- 🎯 数据访问层 (Repository Pattern)
-- 🎯 数据库迁移系统
-
-## 🔍 SkyWalking 集成说明 **[后期打包时处理]**
-
-> **重要提示**: SkyWalking Go Agent 目前存在兼容性问题，在开发阶段暂时跳过。
-> 该功能将在后期打包和生产部署时重新评估和集成。
-
-### 预期自动支持的功能 **[规划中]**
-- 🔄 Gin HTTP框架 (sing-box-web)
-- 🔄 gRPC服务端和客户端 (sing-box-api ↔ sing-box-agent)
-- 🔄 GORM数据库操作 (PostgreSQL)
-- 🔄 Redis操作 (go-redis)
-- 🔄 标准库http.Client
-
-### 预期需要手动处理的场景 **[规划中]**
-- ⏸️ WebSocket连接 (需要手动span)
-- ⏸️ Clash API代理 (需要手动span)
-- ⏸️ 文件操作
-- ⏸️ 第三方SDK调用
-
-### 构建和部署策略 **[后期实施]**
-- 当前阶段: 使用 `make build` 构建不带追踪的版本 (默认)
-- 后期计划: 使用 `make build` 构建带SkyWalking的版本
-- 后期计划: 使用 `make build-no-tracing` 构建不带追踪的版本
-- 环境变量配置详见 `Tech_Stack.md`
-
-### 🛠️ SkyWalking 快速参考 **[后期使用]**
-```bash
-# 安装 SkyWalking Go Agent (后期)
-go install github.com/apache/skywalking-go/tools/go-agent@latest
-
-# 验证安装 (后期)
-make check-skywalking
-
-# 构建带追踪的版本 (后期)
-make build
-
-# 构建不带追踪的版本 (当前默认)
-make build-no-tracing
-```
+### Quality Risks
+- **Code Review Process**: Mandatory PR review mechanism
+- **Automated Testing**: CI/CD integrated automated testing
+- **Performance Baseline**: Establish performance baseline testing
 
 ---
 
-*最后更新时间: 2025-01-16*
+## Team Division Suggestions
+
+### Backend Development (2 people)
+- **Developer A**: sing-box-web + sing-box-api
+- **Developer B**: sing-box-agent + basic framework
+
+### Frontend Development (1 person)
+- **Developer C**: Vue.js frontend UI development
+
+### DevOps/Testing (1 person)
+- **Developer D**: CI/CD, testing, deployment, monitoring
+
+---
+
+## Current Status Summary
+
+**Completed**:
+- Project architecture design
+- gRPC service definitions
+- Project structure planning
+- Development plan formulation
+
+**In Progress**:
+- Basic framework setup
+- Development environment configuration
+
+**To Start**:
+- Core business logic implementation
+- Frontend UI development
+- System integration testing
+
+---
+
+*Last Updated: 2025-07-17*
+*Expected Completion: 2025-10-17 (12 weeks)*
