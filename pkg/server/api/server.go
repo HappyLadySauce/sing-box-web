@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	configv1 "sing-box-web/pkg/config/v1"
+	"sing-box-web/pkg/database"
 	"sing-box-web/pkg/logger"
 	pbv1 "sing-box-web/pkg/pb/v1"
 )
@@ -22,6 +23,7 @@ type Server struct {
 	grpcServer *grpc.Server
 	listener   net.Listener
 	logger     *zap.Logger
+	dbService  *database.Service
 
 	// Services
 	managementService *ManagementService
@@ -29,7 +31,7 @@ type Server struct {
 }
 
 // NewServer creates a new gRPC API server
-func NewServer(config configv1.APIConfig) (*Server, error) {
+func NewServer(config configv1.APIConfig, dbService *database.Service) (*Server, error) {
 	logger := logger.GetLogger().Named("api-server")
 
 	// Create gRPC server with options
@@ -55,8 +57,8 @@ func NewServer(config configv1.APIConfig) (*Server, error) {
 	grpcServer := grpc.NewServer(opts...)
 
 	// Create services
-	managementService := NewManagementService(config, logger)
-	agentService := NewAgentService(config, logger)
+	managementService := NewManagementService(dbService, logger)
+	agentService := NewAgentService(config, dbService, logger)
 
 	// Register services
 	pbv1.RegisterManagementServiceServer(grpcServer, managementService)
@@ -69,6 +71,7 @@ func NewServer(config configv1.APIConfig) (*Server, error) {
 		config:            config,
 		grpcServer:        grpcServer,
 		logger:            logger,
+		dbService:         dbService,
 		managementService: managementService,
 		agentService:      agentService,
 	}, nil

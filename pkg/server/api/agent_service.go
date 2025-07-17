@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	configv1 "sing-box-web/pkg/config/v1"
+	"sing-box-web/pkg/database"
+	"sing-box-web/pkg/models"
 	pbv1 "sing-box-web/pkg/pb/v1"
 )
 
@@ -18,8 +21,9 @@ import (
 type AgentService struct {
 	pbv1.UnimplementedAgentServiceServer
 
-	config configv1.APIConfig
-	logger *zap.Logger
+	config    configv1.APIConfig
+	logger    *zap.Logger
+	dbService *database.Service
 
 	// Node management
 	nodes    map[string]*NodeState
@@ -39,10 +43,11 @@ type NodeState struct {
 }
 
 // NewAgentService creates a new AgentService instance
-func NewAgentService(config configv1.APIConfig, logger *zap.Logger) *AgentService {
+func NewAgentService(config configv1.APIConfig, dbService *database.Service, logger *zap.Logger) *AgentService {
 	return &AgentService{
 		config:        config,
 		logger:        logger.Named("agent-service"),
+		dbService:     dbService,
 		nodes:         make(map[string]*NodeState),
 		commandQueues: make(map[string]chan *pbv1.PendingCommand),
 	}
@@ -84,11 +89,63 @@ func (s *AgentService) RegisterNode(ctx context.Context, req *pbv1.RegisterNodeR
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
 
-	// Update node state
+	// Parse node ID for database operations
+	nodeID, err := strconv.ParseUint(req.NodeId, 10, 32)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid node_id format")
+	}
+
+	// Update or create node in database
+	now := time.Now()
+	node := &models.Node{
+		ID:              uint(nodeID),
+		Name:            req.NodeName,
+		Host:            req.NodeIp,
+		Port:            8080, // Default port since not in protobuf
+		Status:          models.NodeStatusOnline,
+		LastHeartbeat:   &now,
+		SingBoxVersion:  req.Version,
+		ConfigVersion:   1,
+		CurrentUsers:    0,
+		MaxUsers:        1000, // Default since not in protobuf
+		CPUUsage:        0,
+		MemoryUsage:     0,
+		DiskUsage:       0,
+		UploadTraffic:   0,
+		DownloadTraffic: 0,
+		Load1:           0,
+		Load5:           0,
+		Load15:          0,
+		ConfigContent:   "",
+	}
+
+	// Check if node exists, update or create
+	if existingNode, err := s.dbService.GetRepository().Node.GetByID(uint(nodeID)); err == nil {
+		// Update existing node
+		existingNode.Name = req.NodeName
+		existingNode.Host = req.NodeIp
+		existingNode.Status = models.NodeStatusOnline
+		existingNode.LastHeartbeat = &now
+		existingNode.SingBoxVersion = req.Version
+		err = s.dbService.GetRepository().Node.Update(existingNode)
+		if err != nil {
+			s.logger.Error("Failed to update node in database", zap.Error(err))
+			return nil, status.Error(codes.Internal, "failed to update node")
+		}
+	} else {
+		// Create new node
+		err = s.dbService.GetRepository().Node.Create(node)
+		if err != nil {
+			s.logger.Error("Failed to create node in database", zap.Error(err))
+			return nil, status.Error(codes.Internal, "failed to create node")
+		}
+	}
+
+	// Update node state in memory
 	s.nodesMux.Lock()
 	s.nodes[req.NodeId] = &NodeState{
 		Info:     req,
-		LastSeen: time.Now(),
+		LastSeen: now,
 		Status:   &pbv1.NodeStatus{Status: "online"},
 	}
 	s.nodesMux.Unlock()
@@ -146,15 +203,47 @@ func (s *AgentService) ReportMetrics(ctx context.Context, req *pbv1.ReportMetric
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
 
-	// Update node metrics
+	// Parse node ID
+	nodeID, err := strconv.ParseUint(req.NodeId, 10, 32)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid node_id format")
+	}
+
+	// Update node metrics in database
+	if req.Metrics != nil {
+		node, err := s.dbService.GetRepository().Node.GetByID(uint(nodeID))
+		if err != nil {
+			s.logger.Error("Failed to get node for metrics update", zap.Error(err))
+			return nil, status.Error(codes.NotFound, "node not found")
+		}
+
+		// Update node metrics
+		now := time.Now()
+		node.LastHeartbeat = &now
+		node.CPUUsage = req.Metrics.CpuUsagePercent
+		node.MemoryUsage = req.Metrics.MemoryUsagePercent
+		node.DiskUsage = req.Metrics.DiskUsagePercent
+		node.Load1 = req.Metrics.LoadAverage
+		node.Load5 = req.Metrics.LoadAverage
+		node.Load15 = req.Metrics.LoadAverage
+		node.CurrentUsers = int(req.Metrics.ActiveConnections)
+		node.UploadTraffic = req.Metrics.NetworkOutBytesPerSec
+		node.DownloadTraffic = req.Metrics.NetworkInBytesPerSec
+
+		err = s.dbService.GetRepository().Node.Update(node)
+		if err != nil {
+			s.logger.Error("Failed to update node metrics in database", zap.Error(err))
+			return nil, status.Error(codes.Internal, "failed to update node metrics")
+		}
+	}
+
+	// Update node metrics in memory
 	s.nodesMux.Lock()
 	if node, exists := s.nodes[req.NodeId]; exists {
 		node.Metrics = req.Metrics
 		node.LastSeen = time.Now()
 	}
 	s.nodesMux.Unlock()
-
-	// TODO: Store metrics in database
 
 	return &pbv1.ReportMetricsResponse{
 		Success: true,
@@ -173,8 +262,62 @@ func (s *AgentService) ReportTraffic(ctx context.Context, req *pbv1.ReportTraffi
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
 
-	// TODO: Store traffic data in database
-	// TODO: Check traffic limits and generate alerts
+	// Parse node ID
+	nodeID, err := strconv.ParseUint(req.NodeId, 10, 32)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid node_id format")
+	}
+
+	// Store traffic data in database
+	for _, userTraffic := range req.UserTraffic {
+		// Parse user ID
+		userID, err := strconv.ParseUint(userTraffic.UserId, 10, 32)
+		if err != nil {
+			s.logger.Error("Invalid user ID format", zap.String("user_id", userTraffic.UserId))
+			continue
+		}
+
+		// Create traffic record
+		trafficRecord := &models.TrafficRecord{
+			UserID:   uint(userID),
+			NodeID:   uint(nodeID),
+			Upload:   userTraffic.UploadBytes,
+			Download: userTraffic.DownloadBytes,
+			Total:    userTraffic.UploadBytes + userTraffic.DownloadBytes,
+		}
+
+		// Save traffic record
+		err = s.dbService.GetRepository().Traffic.CreateRecord(trafficRecord)
+		if err != nil {
+			s.logger.Error("Failed to save traffic record", zap.Error(err))
+			continue
+		}
+
+		// Update user's traffic usage
+		user, err := s.dbService.GetRepository().User.GetByID(uint(userID))
+		if err != nil {
+			s.logger.Error("Failed to get user for traffic update", zap.Error(err))
+			continue
+		}
+
+		// Update user traffic usage
+		user.TrafficUsed += userTraffic.UploadBytes + userTraffic.DownloadBytes
+		err = s.dbService.GetRepository().User.Update(user)
+		if err != nil {
+			s.logger.Error("Failed to update user traffic usage", zap.Error(err))
+			continue
+		}
+
+		// Check traffic limits and generate alerts
+		if user.TrafficUsed > user.TrafficQuota {
+			s.logger.Warn("User exceeded traffic quota",
+				zap.String("user_id", userTraffic.UserId),
+				zap.Int64("used", user.TrafficUsed),
+				zap.Int64("quota", user.TrafficQuota),
+			)
+			// TODO: Generate alert or suspend user
+		}
+	}
 
 	return &pbv1.ReportTrafficResponse{
 		Success: true,

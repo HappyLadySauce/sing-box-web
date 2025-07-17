@@ -774,7 +774,7 @@ func (s *ManagementService) convertNodeToProto(node *models.Node) *pbv1.NodeInfo
 		Version:       node.SingBoxVersion,
 		LastSeen:      lastSeen,
 		UserCount:     int32(node.CurrentUsers),
-		ConfigVersion: int32(node.ConfigVersion),
+		ConfigVersion: strconv.Itoa(node.ConfigVersion),
 	}
 }
 
@@ -792,7 +792,7 @@ func (s *ManagementService) convertUserToProto(user *models.User) *pbv1.UserInfo
 		Username:  user.Username,
 		Email:     user.Email,
 		Status:    string(user.Status),
-		PlanId:    int32(user.PlanID),
+		PlanId:    int64(user.PlanID),
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 		ExpiresAt: expiresAt,
@@ -803,12 +803,10 @@ func (s *ManagementService) convertTrafficToProto(records []*models.TrafficRecor
 	pbRecords := make([]*pbv1.TrafficData, len(records))
 	for i, record := range records {
 		pbRecords[i] = &pbv1.TrafficData{
-			UserId:    strconv.FormatUint(uint64(record.UserID), 10),
-			NodeId:    strconv.FormatUint(uint64(record.NodeID), 10),
-			Upload:    record.Upload,
-			Download:  record.Download,
-			Total:     record.Total,
-			Timestamp: record.CreatedAt.Unix(),
+			Timestamp:     timestamppb.New(record.CreatedAt),
+			UploadBytes:   record.Upload,
+			DownloadBytes: record.Download,
+			NodeId:        strconv.FormatUint(uint64(record.NodeID), 10),
 		}
 	}
 	return pbRecords

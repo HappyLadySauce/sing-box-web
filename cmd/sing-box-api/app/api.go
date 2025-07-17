@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	configv1 "sing-box-web/pkg/config/v1"
+	"sing-box-web/pkg/database"
 	"sing-box-web/pkg/logger"
 	"sing-box-web/pkg/server/api"
 )
@@ -48,8 +49,14 @@ func run(ctx context.Context, configPath string) error {
 		zap.Int("port", config.GRPC.Port),
 	)
 
+	// Initialize database
+	dbService, err := database.New(config.Database, log)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
 	// Create and start API server
-	server, err := api.NewServer(*config)
+	server, err := api.NewServer(*config, dbService)
 	if err != nil {
 		return fmt.Errorf("failed to create API server: %w", err)
 	}
