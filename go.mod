@@ -6,6 +6,7 @@ toolchain go1.24.5
 
 require (
 	github.com/gin-gonic/gin v1.10.1
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/karmada-io/dashboard v0.1.0
 	github.com/prometheus/client_golang v1.19.1
 	github.com/spf13/cobra v1.8.1

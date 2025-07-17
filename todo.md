@@ -11,36 +11,39 @@ A lightweight, high-availability distributed sing-box management platform based 
 - [x] Complete project directory structure design
 - [x] Create gRPC protobuf definition files
 - [x] Complete architecture design documentation
-- [ ] Configure development environment and toolchain
-  - [ ] Setup protobuf compilation environment
-  - [ ] Setup Makefile build scripts
-  - [ ] Configure Go module dependency management
-  - [ ] Setup code formatting and linting tools
+- [x] Configure development environment and toolchain
+  - [x] Setup protobuf compilation environment
+  - [x] Setup Makefile build scripts
+  - [x] Configure Go module dependency management
+  - [x] Setup code formatting and linting tools
 
 ### 1.2 Core Framework
-- [ ] Implement pkg/config configuration management module
-  - [ ] Create versioned configuration structure (v1)
-  - [ ] Implement configuration validation logic
-  - [ ] Support YAML/JSON configuration files
-  - [ ] Configuration default value settings
-- [ ] Implement pkg/logger logging module
-  - [ ] Integrate Zap structured logging
-  - [ ] Support log level configuration
-  - [ ] Support log file rotation
-- [ ] Implement pkg/metrics monitoring metrics module
-  - [ ] Integrate Prometheus client
-  - [ ] Define core business metrics
-  - [ ] Implement metrics collector
+- [x] Implement pkg/config configuration management module
+  - [x] Create versioned configuration structure (v1)
+  - [x] Implement configuration validation logic
+  - [x] Support YAML/JSON configuration files
+  - [x] Configuration default value settings
+  - [x] Add Viper integration for environment variables
+- [x] Implement pkg/logger logging module
+  - [x] Integrate Zap structured logging
+  - [x] Support log level configuration
+  - [x] Support log file rotation
+  - [x] Add business logging functions (user actions, node events, API calls)
+- [x] Implement pkg/metrics monitoring metrics module
+  - [x] Integrate Prometheus client
+  - [x] Define core business metrics
+  - [x] Implement metrics collector
+  - [x] Add HTTP/gRPC/database/business metrics
 
 ### 1.3 gRPC Service Framework
-- [ ] Generate protobuf Go code
-- [ ] Implement gRPC server framework
-  - [ ] AgentService server framework
-  - [ ] ManagementService server framework
-- [ ] Implement gRPC client framework
-  - [ ] gRPC connection manager
-  - [ ] Client reconnection logic
-  - [ ] Client load balancing
+- [x] Generate protobuf Go code
+- [x] Implement gRPC server framework
+  - [x] AgentService server framework
+  - [x] ManagementService server framework
+- [x] Implement gRPC client framework
+  - [x] gRPC connection manager
+  - [x] Client reconnection logic
+  - [x] Client load balancing
 
 ---
 
