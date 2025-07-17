@@ -62,6 +62,11 @@ type TrafficRepository interface {
 	// Batch operations
 	BatchCreateRecords(records []*models.TrafficRecord) error
 	BatchUpdateRecords(records []*models.TrafficRecord) error
+	
+	// Additional methods for gRPC service
+	GetUserTraffic(userID uint, start, end time.Time) ([]*models.TrafficRecord, error)
+	GetNodeTraffic(nodeID uint, start, end time.Time) ([]*models.TrafficRecord, error)
+	GetTotalTrafficInRange(start, end time.Time) (int64, error)
 }
 
 // trafficRepository implements TrafficRepository interface
@@ -556,4 +561,43 @@ func (r *trafficRepository) BatchUpdateRecords(records []*models.TrafficRecord) 
 		}
 		return nil
 	})
+}
+
+// GetUserTraffic gets traffic records for a specific user in time range
+func (r *trafficRepository) GetUserTraffic(userID uint, start, end time.Time) ([]*models.TrafficRecord, error) {
+	var records []*models.TrafficRecord
+	query := r.db.Preload("User").Preload("Node").Where("user_id = ?", userID)
+	
+	if !start.IsZero() && !end.IsZero() {
+		query = query.Where("record_date BETWEEN ? AND ?", start, end)
+	}
+	
+	err := query.Order("record_date DESC").Find(&records).Error
+	return records, err
+}
+
+// GetNodeTraffic gets traffic records for a specific node in time range
+func (r *trafficRepository) GetNodeTraffic(nodeID uint, start, end time.Time) ([]*models.TrafficRecord, error) {
+	var records []*models.TrafficRecord
+	query := r.db.Preload("User").Preload("Node").Where("node_id = ?", nodeID)
+	
+	if !start.IsZero() && !end.IsZero() {
+		query = query.Where("record_date BETWEEN ? AND ?", start, end)
+	}
+	
+	err := query.Order("record_date DESC").Find(&records).Error
+	return records, err
+}
+
+// GetTotalTrafficInRange gets total traffic in a time range
+func (r *trafficRepository) GetTotalTrafficInRange(start, end time.Time) (int64, error) {
+	var total int64
+	query := r.db.Model(&models.TrafficRecord{}).Select("COALESCE(SUM(total), 0)")
+	
+	if !start.IsZero() && !end.IsZero() {
+		query = query.Where("record_date BETWEEN ? AND ?", start, end)
+	}
+	
+	err := query.Scan(&total).Error
+	return total, err
 }

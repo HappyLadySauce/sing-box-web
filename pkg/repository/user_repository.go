@@ -45,6 +45,10 @@ type UserRepository interface {
 	// Batch operations
 	BatchUpdateStatus(userIDs []uint, status models.UserStatus) error
 	BatchDelete(userIDs []uint) error
+	
+	// Statistics
+	GetSystemStats() (*models.SystemStats, error)
+	UpdateStatus(userID uint, status models.UserStatus) error
 }
 
 // userRepository implements UserRepository interface
@@ -333,4 +337,33 @@ func (r *userRepository) BatchUpdateStatus(userIDs []uint, status models.UserSta
 // BatchDelete soft deletes multiple users
 func (r *userRepository) BatchDelete(userIDs []uint) error {
 	return r.db.Delete(&models.User{}, userIDs).Error
+}
+
+// GetSystemStats gets system statistics
+func (r *userRepository) GetSystemStats() (*models.SystemStats, error) {
+	var stats models.SystemStats
+	
+	// Get total users
+	err := r.db.Model(&models.User{}).Count(&stats.TotalUsers).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	// Get active users
+	err = r.db.Model(&models.User{}).
+		Where("status = ?", models.UserStatusActive).
+		Count(&stats.ActiveUsers).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	return &stats, nil
+}
+
+// UpdateStatus updates user status
+func (r *userRepository) UpdateStatus(userID uint, status models.UserStatus) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", userID).
+		Update("status", status).
+		Error
 }

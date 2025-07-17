@@ -43,6 +43,7 @@ type NodeRepository interface {
 	GetTopTrafficNodes(limit int) ([]*models.Node, error)
 	GetNodesWithHighLoad(cpuThreshold, memoryThreshold float64) ([]*models.Node, error)
 	GetOfflineNodes(threshold time.Duration) ([]*models.Node, error)
+	GetNodeStats() (*models.NodeStats, error)
 	
 	// Node access management
 	GetUserNodes(userID uint) ([]*models.Node, error)
@@ -504,4 +505,25 @@ func (r *nodeRepository) BatchDisable(nodeIDs []uint) error {
 // BatchDelete soft deletes multiple nodes
 func (r *nodeRepository) BatchDelete(nodeIDs []uint) error {
 	return r.db.Delete(&models.Node{}, nodeIDs).Error
+}
+
+// GetNodeStats gets node statistics
+func (r *nodeRepository) GetNodeStats() (*models.NodeStats, error) {
+	var stats models.NodeStats
+	
+	// Get total nodes
+	err := r.db.Model(&models.Node{}).Count(&stats.TotalNodes).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	// Get online nodes
+	err = r.db.Model(&models.Node{}).
+		Where("status = ?", models.NodeStatusOnline).
+		Count(&stats.OnlineNodes).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	return &stats, nil
 }

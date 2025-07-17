@@ -95,6 +95,7 @@ type Node struct {
 
 	// Configuration and version
 	ConfigVersion  int    `json:"config_version" gorm:"not null;default:0"`
+	ConfigContent  string `json:"config_content,omitempty" gorm:"type:text;comment:Node configuration content"`
 	AgentVersion   string `json:"agent_version" gorm:"size:32"`
 	SingBoxVersion string `json:"sing_box_version" gorm:"size:32"`
 
@@ -200,4 +201,16 @@ type NodeLog struct {
 // TableName returns the table name for NodeLog model
 func (NodeLog) TableName() string {
 	return "node_logs"
+}
+
+// SystemStats represents system statistics
+type SystemStats struct {
+	TotalUsers  int64 `json:"total_users"`
+	ActiveUsers int64 `json:"active_users"`
+}
+
+// NodeStats represents node statistics
+type NodeStats struct {
+	TotalNodes  int64 `json:"total_nodes"`
+	OnlineNodes int64 `json:"online_nodes"`
 }
