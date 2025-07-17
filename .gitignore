@@ -123,3 +123,5 @@ envoy
 # Air live reload
 tmp/
 
+frp
+Karmada-Manager
