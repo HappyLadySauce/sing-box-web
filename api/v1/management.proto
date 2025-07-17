@@ -6,6 +6,7 @@ option go_package = "sing-box-web/api/v1;v1";
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
+import "v1/agent.proto";
 
 // Management service - 管理API服务，供sing-box-web调用
 service ManagementService {
@@ -330,10 +331,4 @@ message OperationResult {
   string message = 3;
 }
 
-// 复用agent.proto中的NodeCapability
-message NodeCapability {
-  int32 max_connections = 1;
-  int64 max_bandwidth_mbps = 2;
-  repeated string supported_protocols = 3;
-  map<string, string> features = 4;
-}
+// NodeCapability is defined in agent.proto and reused here

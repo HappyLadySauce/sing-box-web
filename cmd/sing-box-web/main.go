@@ -9,7 +9,7 @@ import (
 
 func main() {
 	ctx := context.TODO()
-	rootCmd := app.NewAPICommand(ctx)
+	rootCmd := app.NewWebCommand(ctx)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

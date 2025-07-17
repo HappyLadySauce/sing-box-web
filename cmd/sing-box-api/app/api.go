@@ -4,82 +4,63 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/karmada-io/dashboard/cmd/api/app/options"
-	"github.com/karmada-io/dashboard/cmd/api/app/router"
-	_ "github.com/karmada-io/dashboard/cmd/api/app/routes/auth"                     // Importing route packages forces route registration
-
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
+	"go.uber.org/zap"
 
-	"sing-box-web/cmd/sing-box-api/app/options"
+	configv1 "sing-box-web/pkg/config/v1"
 	"sing-box-web/pkg/logger"
+	"sing-box-web/pkg/server/api"
 )
 
-// sing-box-api 是 sing-box-web 的 api 服务，用于提供给 sing-box-web 使用
-// 同时，sing-box-api 也是 sing-box-agent 的 api 服务，用于提供给 sing-box-agent 使用
+// NewAPICommand creates a new API command
 func NewAPICommand(ctx context.Context) *cobra.Command {
-	opts := options.NewOptions()
+	var configPath string
+	
 	cmd := &cobra.Command{
-		Use:  "sing-box-api",
-		Long: `The sing-box-api provide api for sing-box-web web ui and sing-box-agent.`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			// 验证选项，如果选项不合法，则返回错误
-			if err := opts.Validate(); err != nil {
-				return err
-			}
-			// 运行 sing-box-api
-			if err := run(ctx, opts); err != nil {
-				return err
-			}
-			return nil
-		},
-		// 参数验证
-		Args: func(cmd *cobra.Command, args []string) error {
-			for _, arg := range args {
-				if len(arg) > 0 {
-					return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
-				}
-			}
-			return nil
+		Use:   "sing-box-api",
+		Short: "Sing-box API server",
+		Long:  "The sing-box-api provides gRPC API for sing-box-web and sing-box-agent.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(ctx, configPath)
 		},
 	}
-	// 直接用 pflag.NewFlagSet
-	genericFlagSet := pflag.NewFlagSet("generic", pflag.ExitOnError)
-	opts.AddFlags(genericFlagSet)
-
-	logsFlagSet := pflag.NewFlagSet("logs", pflag.ExitOnError)
-	logger.AddFlags(logsFlagSet)
-
-	cmd.Flags().AddFlagSet(genericFlagSet)
-	cmd.Flags().AddFlagSet(logsFlagSet)
-	// 返回命令
+	
+	cmd.Flags().StringVar(&configPath, "config", "", "Path to configuration file")
+	
 	return cmd
 }
 
-func run(ctx context.Context, opts *options.Options) error {
+func run(ctx context.Context, configPath string) error {
+	// Load configuration
+	config := configv1.DefaultAPIConfig()
+	if configPath != "" {
+		// TODO: Load config from file
+	}
+	
 	// Initialize logger
-	logConfig := logger.DefaultConfig()
-	log, err := logger.NewLogger(logConfig)
-	if err != nil {
+	if err := logger.InitLogger(config.Log); err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
-
-	log.Infof("Starting sing-box-api on %s:%d", opts.BindAddress, opts.Port)
 	
-	// TODO: Initialize API server components
-	// This will be implemented in the next phases
+	log := logger.GetLogger().Named("api-main")
+	log.Info("Starting sing-box-api", 
+		zap.String("address", config.GRPC.Address),
+		zap.Int("port", config.GRPC.Port),
+	)
 	
-	return nil
+	// Create and start API server
+	server, err := api.NewServer(*config)
+	if err != nil {
+		return fmt.Errorf("failed to create API server: %w", err)
+	}
+	
+	if err := server.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start API server: %w", err)
+	}
+	
+	// Wait for context cancellation
+	<-ctx.Done()
+	
+	log.Info("Shutting down sing-box-api")
+	return server.Stop(ctx)
 }
-
-
-
-
-
-
-
-
-
-
-
-
