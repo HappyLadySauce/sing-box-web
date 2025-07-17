@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"go.uber.org/zap"
 
@@ -23,14 +24,6 @@ type Service struct {
 
 // New creates a new database service
 func New(config configv1.DatabaseConfig, logger *zap.Logger) (*Service, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		config.Username,
-		config.Password,
-		config.Host,
-		config.Port,
-		config.Database,
-	)
-
 	// Configure GORM
 	gormConfig := &gorm.Config{
 		NowFunc: func() time.Time {
@@ -39,7 +32,25 @@ func New(config configv1.DatabaseConfig, logger *zap.Logger) (*Service, error) {
 		DisableForeignKeyConstraintWhenMigrating: true,
 	}
 
-	db, err := gorm.Open(mysql.Open(dsn), gormConfig)
+	var db *gorm.DB
+	var err error
+
+	switch config.Driver {
+	case "sqlite":
+		db, err = gorm.Open(sqlite.Open(config.Database), gormConfig)
+	case "mysql":
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+			config.Username,
+			config.Password,
+			config.Host,
+			config.Port,
+			config.Database,
+		)
+		db, err = gorm.Open(mysql.Open(dsn), gormConfig)
+	default:
+		return nil, fmt.Errorf("unsupported database driver: %s", config.Driver)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}

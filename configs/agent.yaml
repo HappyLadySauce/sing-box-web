@@ -3,12 +3,12 @@ kind: AgentConfig
 
 # Node information
 node:
-  nodeId: "node-001"
+  nodeId: "1"
   nodeName: "Node-001"
   region: "us-east-1"
   tags:
-    - "production"
-    - "frontend"
+    environment: "production"
+    role: "frontend"
   maxUsers: 1000
   description: "Production frontend node"
 

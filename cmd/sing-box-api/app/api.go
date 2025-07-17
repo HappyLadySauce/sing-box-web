@@ -3,9 +3,11 @@ package app
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v2"
 
 	configv1 "sing-box-web/pkg/config/v1"
 	"sing-box-web/pkg/database"
@@ -35,7 +37,14 @@ func run(ctx context.Context, configPath string) error {
 	// Load configuration
 	config := configv1.DefaultAPIConfig()
 	if configPath != "" {
-		// TODO: Load config from file
+		data, err := ioutil.ReadFile(configPath)
+		if err != nil {
+			return fmt.Errorf("failed to read config file: %w", err)
+		}
+		
+		if err := yaml.Unmarshal(data, config); err != nil {
+			return fmt.Errorf("failed to parse config file: %w", err)
+		}
 	}
 
 	// Initialize logger
@@ -53,6 +62,11 @@ func run(ctx context.Context, configPath string) error {
 	dbService, err := database.New(config.Database, log)
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	// Run database migrations
+	if err := dbService.AutoMigrate(); err != nil {
+		return fmt.Errorf("failed to migrate database: %w", err)
 	}
 
 	// Create and start API server
