@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 
 	configv1 "sing-box-web/pkg/config/v1"
 	"sing-box-web/pkg/database"
@@ -277,13 +278,17 @@ func (s *AgentService) ReportTraffic(ctx context.Context, req *pbv1.ReportTraffi
 			continue
 		}
 
-		// Create traffic record
+		// Create traffic record with proper time values
+		now := time.Now()
 		trafficRecord := &models.TrafficRecord{
-			UserID:   uint(userID),
-			NodeID:   uint(nodeID),
-			Upload:   userTraffic.UploadBytes,
-			Download: userTraffic.DownloadBytes,
-			Total:    userTraffic.UploadBytes + userTraffic.DownloadBytes,
+			UserID:      uint(userID),
+			NodeID:      uint(nodeID),
+			Upload:      userTraffic.UploadBytes,
+			Download:    userTraffic.DownloadBytes,
+			Total:       userTraffic.UploadBytes + userTraffic.DownloadBytes,
+			ConnectTime: now,
+			RecordDate:  now.Truncate(24 * time.Hour),
+			RecordHour:  now.Hour(),
 		}
 
 		// Save traffic record
@@ -293,14 +298,23 @@ func (s *AgentService) ReportTraffic(ctx context.Context, req *pbv1.ReportTraffi
 			continue
 		}
 
-		// Update user's traffic usage
+		// Check if user exists before updating traffic
 		user, err := s.dbService.GetRepository().User.GetByID(uint(userID))
 		if err != nil {
-			s.logger.Error("Failed to get user for traffic update", zap.Error(err))
-			continue
+			if err == gorm.ErrRecordNotFound {
+				// Log as debug instead of warning - this might be normal during testing
+				s.logger.Debug("User not found for traffic update - traffic record saved but user traffic not updated", 
+					zap.Uint("user_id", uint(userID)),
+					zap.Int64("upload_bytes", userTraffic.UploadBytes),
+					zap.Int64("download_bytes", userTraffic.DownloadBytes))
+				continue
+			} else {
+				s.logger.Error("Failed to get user for traffic update", zap.Error(err))
+				continue
+			}
 		}
 
-		// Update user traffic usage
+		// Update user traffic usage only if user exists
 		user.TrafficUsed += userTraffic.UploadBytes + userTraffic.DownloadBytes
 		err = s.dbService.GetRepository().User.Update(user)
 		if err != nil {
@@ -308,8 +322,8 @@ func (s *AgentService) ReportTraffic(ctx context.Context, req *pbv1.ReportTraffi
 			continue
 		}
 
-		// Check traffic limits and generate alerts
-		if user.TrafficUsed > user.TrafficQuota {
+		// Check traffic limits and generate alerts (only for users with traffic quota > 0)
+		if user.TrafficQuota > 0 && user.TrafficUsed > user.TrafficQuota {
 			s.logger.Warn("User exceeded traffic quota",
 				zap.String("user_id", userTraffic.UserId),
 				zap.Int64("used", user.TrafficUsed),

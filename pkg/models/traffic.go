@@ -32,7 +32,7 @@ type TrafficRecord struct {
 
 	// Session information
 	SessionID    string    `json:"session_id" gorm:"size:64;index;comment:Session identifier"`
-	ConnectTime  time.Time `json:"connect_time" gorm:"comment:Connection start time"`
+	ConnectTime  time.Time `json:"connect_time" gorm:"not null;comment:Connection start time"`
 	DisconnectTime *time.Time `json:"disconnect_time,omitempty" gorm:"comment:Connection end time"`
 	Duration     int64     `json:"duration" gorm:"not null;default:0;comment:Connection duration in seconds"`
 
@@ -65,6 +65,9 @@ func (tr *TrafficRecord) BeforeCreate(tx *gorm.DB) error {
 	}
 	if tr.RecordHour == 0 {
 		tr.RecordHour = time.Now().Hour()
+	}
+	if tr.ConnectTime.IsZero() {
+		tr.ConnectTime = time.Now()
 	}
 	return nil
 }
