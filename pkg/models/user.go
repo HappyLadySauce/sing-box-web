@@ -16,6 +16,14 @@ const (
 	UserStatusDisabled  UserStatus = "disabled"
 )
 
+// UserRole represents user role
+type UserRole string
+
+const (
+	UserRoleUser  UserRole = "user"
+	UserRoleAdmin UserRole = "admin"
+)
+
 // User represents a sing-box user
 type User struct {
 	ID        uint           `json:"id" gorm:"primaryKey"`
@@ -30,6 +38,7 @@ type User struct {
 	DisplayName string     `json:"display_name" gorm:"size:128"`
 	Avatar      string     `json:"avatar" gorm:"size:512"`
 	Status      UserStatus `json:"status" gorm:"not null;default:'active';size:20"`
+	Role        UserRole   `json:"role" gorm:"not null;default:'user';size:20"`
 
 	// Plan and quota
 	PlanID            uint      `json:"plan_id" gorm:"not null"`

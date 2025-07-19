@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -19,18 +20,37 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+// UserRepository interface for user operations
+type UserRepository interface {
+	GetByID(id uint) (*User, error)
+}
+
+// User represents basic user info for JWT
+type User struct {
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+	Role     string `json:"role"`
+}
+
 // JWTManager manages JWT token operations
 type JWTManager struct {
-	config configv1.AuthConfig
-	logger *zap.Logger
+	config   configv1.AuthConfig
+	logger   *zap.Logger
+	userRepo UserRepository
 }
 
 // NewJWTManager creates a new JWT manager
 func NewJWTManager(config configv1.AuthConfig, logger *zap.Logger) *JWTManager {
 	return &JWTManager{
-		config: config,
-		logger: logger,
+		config:   config,
+		logger:   logger,
+		userRepo: nil, // Will be set via dependency injection
 	}
+}
+
+// SetUserRepository sets the user repository for database operations
+func (j *JWTManager) SetUserRepository(userRepo UserRepository) {
+	j.userRepo = userRepo
 }
 
 // GenerateToken generates a JWT token for a user
@@ -141,13 +161,26 @@ func (j *JWTManager) RefreshToken(refreshToken string) (string, error) {
 		return "", errors.New("refresh token expired")
 	}
 
-	// TODO: Get user details from database to generate new token
-	// For now, we'll use placeholder values
+	// Get user details from database to generate new token
 	userID := claims.Subject
-	username := "user" // This should come from database
-	role := "user"     // This should come from database
+	userIDUint, err := strconv.ParseUint(userID, 10, 32)
+	if err != nil {
+		j.logger.Warn("Invalid user ID in refresh token", zap.String("user_id", userID))
+		return "", errors.New("invalid user ID")
+	}
 
-	return j.GenerateToken(userID, username, role)
+	if j.userRepo != nil {
+		user, err := j.userRepo.GetByID(uint(userIDUint))
+		if err != nil {
+			j.logger.Warn("User not found for refresh token", zap.String("user_id", userID))
+			return "", errors.New("user not found")
+		}
+		return j.GenerateToken(userID, user.Username, user.Role)
+	}
+
+	// Fallback if repository not set
+	j.logger.Warn("UserRepository not set, using placeholder values")
+	return j.GenerateToken(userID, "user", "user")
 }
 
 // RevokeToken adds a token to the revocation list
